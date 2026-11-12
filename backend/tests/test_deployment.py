@@ -88,3 +88,27 @@ def test_health_endpoint_is_used_as_the_render_health_check(tmp_path, monkeypatc
 
     app_main._GRAPH = None
     app_main._CHECKPOINTER_CONNECTION = None
+
+
+def test_root_answers_render_health_checks(tmp_path, monkeypatch) -> None:
+    """Render's default health check hits ``/``; it must not 404."""
+    from app.api import app as combined_app
+
+    monkeypatch.setenv("AUDITOR_DB_PATH", str(tmp_path / "auditor.db"))
+    monkeypatch.setenv("AUDITOR_CHECKPOINT_DB", str(tmp_path / "checkpoints.db"))
+    monkeypatch.setattr(app_main, "_GRAPH", None)
+    monkeypatch.setattr(app_main, "_CHECKPOINTER_CONNECTION", None)
+    app_main.initialize_database()
+
+    client = TestClient(combined_app)
+    response = client.get("/")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["docs"] == "/docs"
+
+    head = client.head("/")
+    assert head.status_code == 200
+
+    app_main._GRAPH = None
+    app_main._CHECKPOINTER_CONNECTION = None

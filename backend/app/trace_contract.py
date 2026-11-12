@@ -593,6 +593,31 @@ class DemoFailureModeRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@router.api_route("/", methods=["GET", "HEAD"])
+def trace_root() -> dict[str, Any]:
+    """Service index.
+
+    Render's default health check requests ``/``; answering with a small JSON
+    index keeps the service healthy and tells a human who opens the URL what
+    this API is and where the interactive documentation lives.
+    """
+    return {
+        "service": "TRACE — Financial Filing Auditor API",
+        "version": "2.0.0",
+        "status": "ok",
+        "storage": backend_label(),
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "companies": "/companies",
+            "threads": "/threads",
+            "start_audit": "POST /audits",
+            "audit_log": "/audit-logs",
+            "verify_chain": "/audit-logs/verify",
+        },
+    }
+
+
 @router.get("/health")
 def trace_health() -> dict[str, str]:
     """Liveness probe used by the UI to decide Live vs Demo mode."""
