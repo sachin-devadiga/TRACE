@@ -618,7 +618,7 @@ def trace_root() -> dict[str, Any]:
     }
 
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 def trace_health() -> dict[str, str]:
     """Liveness probe used by the UI to decide Live vs Demo mode."""
     return {
