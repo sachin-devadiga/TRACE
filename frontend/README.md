@@ -7,7 +7,14 @@ metrics from public filings, scores confidence from deterministic signals, valid
 policy, escalates the uncertain to a human reviewer, and keeps every decision accountable in an
 append-only audit log.
 
-This repository contains the **production web UI** for TRACE.
+This folder contains the **production web UI** for TRACE.
+
+It talks to the audit API over the `TraceApi` HTTP contract. The API lives in
+`../backend` — see the [root README](../README.md) for the full stack, the
+Render deployment and the MongoDB setup.
+
+- `VITE_API_MODE=http` → the real FastAPI backend (`VITE_API_BASE`)
+- `VITE_API_MODE=mock` → the in-browser demo server, no backend required
 
 ---
 
@@ -32,7 +39,7 @@ npm run dev          # http://localhost:5173
 # 4. Run the production build
 npm run build
 
-# 5. Run the e2e smoke test
+# 5. Run the e2e tests (live backend + mock)
 npx playwright test
 ```
 
