@@ -30,10 +30,30 @@ def test_cors_origins_are_read_from_the_environment(monkeypatch) -> None:
     ]
 
 
-def test_cors_preflight_allows_the_local_development_origin(
+def test_cors_preflight_allows_any_local_port(
     tmp_path, monkeypatch
 ) -> None:
-    """The middleware is built at import time from ``_cors_origins()``."""
+    """A locally served production build must reach the API."""
+    monkeypatch.setenv("AUDITOR_DB_PATH", str(tmp_path / "auditor.db"))
+    monkeypatch.setenv("AUDITOR_CHECKPOINT_DB", str(tmp_path / "checkpoints.db"))
+    monkeypatch.setattr(app_main, "_GRAPH", None)
+    monkeypatch.setattr(app_main, "_CHECKPOINTER_CONNECTION", None)
+    app_main.initialize_database()
+
+    client = TestClient(app_main.app)
+    for origin in ("http://localhost:5173", "http://127.0.0.1:4173"):
+        response = client.options(
+            "/health",
+            headers={"Origin": origin, "Access-Control-Request-Method": "GET"},
+        )
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == origin
+
+    app_main._GRAPH = None
+    app_main._CHECKPOINTER_CONNECTION = None
+
+
+def test_cors_rejects_unknown_remote_origins(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AUDITOR_DB_PATH", str(tmp_path / "auditor.db"))
     monkeypatch.setenv("AUDITOR_CHECKPOINT_DB", str(tmp_path / "checkpoints.db"))
     monkeypatch.setattr(app_main, "_GRAPH", None)
@@ -44,14 +64,11 @@ def test_cors_preflight_allows_the_local_development_origin(
     response = client.options(
         "/health",
         headers={
-            "Origin": "http://localhost:5173",
+            "Origin": "https://not-allowed.example.com",
             "Access-Control-Request-Method": "GET",
         },
     )
-    assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == (
-        "http://localhost:5173"
-    )
+    assert "access-control-allow-origin" not in response.headers
 
     app_main._GRAPH = None
     app_main._CHECKPOINTER_CONNECTION = None

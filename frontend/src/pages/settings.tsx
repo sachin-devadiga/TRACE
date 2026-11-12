@@ -58,6 +58,14 @@ export function SettingsPage() {
             <span className="text-sm">Connection status</span>
             <span className="text-sm font-medium text-success">{connectionOk ? "Healthy" : "Unreachable"}</span>
           </div>
+          {health?.storage ? (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Storage backend</span>
+              <span className="text-sm font-medium" data-testid="storage-backend">
+                {health.storage}
+              </span>
+            </div>
+          ) : null}
           {mode === "http" ? (
             <div className="text-sm text-muted-foreground">Base URL: {import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000"}</div>
           ) : null}

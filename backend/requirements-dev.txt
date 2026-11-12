@@ -1,0 +1,10 @@
+# Test-only dependencies (never needed in production).
+#
+#     pip install -r requirements.txt -r requirements-dev.txt
+#     python -m pytest tests/ -q
+#
+# mongomock provides an in-process MongoDB so the MongoDB code path is
+# verified without a server.
+
+mongomock==4.3.0
+pytest>=8.0

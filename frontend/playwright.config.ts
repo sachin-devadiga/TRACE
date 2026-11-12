@@ -11,6 +11,10 @@ import { defineConfig } from "@playwright/test";
 const livePort = 5173;
 const mockPort = 5174;
 
+// Chrome is installed on the development machines; CI uses the bundled
+// Chromium build instead.
+const browser = process.platform === "win32" ? { channel: "chrome" } : {};
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 90_000,
@@ -18,7 +22,7 @@ export default defineConfig({
   fullyParallel: false,
   use: {
     viewport: { width: 1440, height: 900 },
-    channel: "chrome",
+    ...browser,
   },
   projects: [
     {

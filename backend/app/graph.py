@@ -30,10 +30,12 @@ from langgraph.graph import END, START, StateGraph  # noqa: E402
 from langgraph.types import Command, interrupt  # noqa: E402
 
 from app.confidence import apply_extractor_agreement, metric_role  # noqa: E402
-from app.database import (  # noqa: E402
+from app.store import (  # noqa: E402
     get_audit_logs,
+    get_checkpoint_path as store_get_checkpoint_path,
     initialize_database,
     insert_audit_log,
+    using_mongodb,
 )
 from app.edgar_client import (  # noqa: E402
     fetch_latest_10k_tables,
@@ -1204,16 +1206,20 @@ def finalize_node(state: AuditState) -> dict[str, Any]:
 
 def get_checkpoint_path() -> Path:
     """Return the configured LangGraph checkpoint database path."""
-    override = (os.getenv("AUDITOR_CHECKPOINT_DB") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return DEFAULT_CHECKPOINT_DB
+    return store_get_checkpoint_path()
 
 
 def build_checkpointer(
     checkpoint_path: Path | str | None = None,
-) -> tuple[sqlite3.Connection, SqliteSaver]:
-    """Open the persistent checkpoint DB and return its connection and saver."""
+) -> tuple[Any, Any]:
+    """Open the persistent checkpoint store and return its connection and saver.
+
+    MongoDB is used when ``MONGO_URI`` is set; otherwise the local SQLite
+    checkpoint file is used.  The first return value is the object that must be
+    closed on shutdown (a SQLite connection, or the Mongo saver).
+    """
+    if using_mongodb():
+        return _build_mongo_checkpointer()
     path = (
         Path(checkpoint_path).expanduser().resolve()
         if checkpoint_path
@@ -1229,6 +1235,32 @@ def build_checkpointer(
     saver = SqliteSaver(connection)
     saver.setup()
     return connection, saver
+
+
+def _build_mongo_checkpointer() -> tuple[Any, Any]:
+    """Return a LangGraph checkpoint saver backed by MongoDB."""
+    from langgraph.checkpoint.mongodb import MongoDBSaver
+
+    from app.mongo_client import get_client, mongo_db_name
+
+    client = get_client()
+    database = client[mongo_db_name()]
+
+    # MongoDBSaver.from_conn_string creates this compound index; we build the
+    # saver directly so we can keep one long-lived client for the process.
+    for collection_name in ("checkpoints", "checkpoint_writes"):
+        database[collection_name].create_index(
+            [("thread_id", 1), ("checkpoint_ns", 1), ("checkpoint_id", -1)],
+            unique=True,
+        )
+
+    saver = MongoDBSaver(
+        client,
+        db_name=mongo_db_name(),
+        checkpoint_collection_name="checkpoints",
+        writes_collection_name="checkpoint_writes",
+    )
+    return saver, saver
 
 
 def build_audit_graph(

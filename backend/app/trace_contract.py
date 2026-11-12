@@ -40,7 +40,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.database import get_audit_logs, insert_audit_log, verify_audit_chain
+from app.store import backend_label, clear_threads, get_audit_logs, insert_audit_log, verify_audit_chain
 from app.demo_seed import clear_threads, seed_demo_threads
 from app.edgar_client import TARGET_COMPANIES
 from app.escalation import ESCALATION_TYPE_LABELS, types_for_item
@@ -596,7 +596,11 @@ class DemoFailureModeRequest(BaseModel):
 @router.get("/health")
 def trace_health() -> dict[str, str]:
     """Liveness probe used by the UI to decide Live vs Demo mode."""
-    return {"status": "ok", "version": "2.0.0"}
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "storage": backend_label(),
+    }
 
 
 @router.get("/companies")

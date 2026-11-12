@@ -18,7 +18,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from app.database import insert_audit_log
+from app.store import clear_threads as clear_threads_in_store
+from app.store import insert_audit_log
 from app.graph import build_audit_graph, build_checkpointer, get_checkpoint_path
 from app.units import normalize_metric_dict
 
@@ -251,22 +252,27 @@ def clear_threads(
     The append-only audit log is never touched: only the resumable workflow
     state is discarded so a demo can start from a clean slate.
     """
-    if not thread_ids:
-        return 0
-    path = Path(checkpoint_db) if checkpoint_db else get_checkpoint_path()
-    connection = sqlite3.connect(str(path), timeout=30.0)
-    try:
-        placeholders = ",".join("?" for _ in thread_ids)
-        removed = connection.execute(
-            f"DELETE FROM checkpoints WHERE thread_id IN ({placeholders})", thread_ids
-        ).rowcount
-        connection.execute(
-            f"DELETE FROM writes WHERE thread_id IN ({placeholders})", thread_ids
-        )
-        connection.commit()
-    finally:
-        connection.close()
-    return removed
+    if checkpoint_db:
+        # A specific SQLite file was requested: use it directly.
+        if not thread_ids:
+            return 0
+        path = Path(checkpoint_db)
+        if not path.exists():
+            return 0
+        connection = sqlite3.connect(str(path), timeout=30.0)
+        try:
+            placeholders = ",".join("?" for _ in thread_ids)
+            removed = connection.execute(
+                f"DELETE FROM checkpoints WHERE thread_id IN ({placeholders})", thread_ids
+            ).rowcount
+            connection.execute(
+                f"DELETE FROM writes WHERE thread_id IN ({placeholders})", thread_ids
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        return removed
+    return clear_threads_in_store(thread_ids)
 
 
 def seed_demo_threads(

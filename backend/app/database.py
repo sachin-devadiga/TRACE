@@ -22,12 +22,14 @@ from typing import Any, Mapping
 __all__ = [
     "AUDIT_DECISIONS",
     "DEFAULT_DB_PATH",
+    "GENESIS_HASH",
     "audit_log_exists",
     "get_audit_logs",
     "get_db_path",
     "initialize_database",
     "insert_audit_log",
     "verify_audit_chain",
+    "verify_rows",
 ]
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -325,19 +327,13 @@ def audit_log_exists(
         connection.close()
 
 
-def verify_audit_chain(db_path: Path | str | None = None) -> dict[str, Any]:
-    """Verify every hashed audit row against its predecessor.
+def verify_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Verify a sequence of hashed audit rows against their predecessor.
 
-    Returns a result dictionary with ``verified``, counts, and the first broken
-    row (if any).  Rows written before hash support was added are reported as
+    Shared by the SQLite and the MongoDB stores so both produce identical
+    results.  Rows written before hash support was added are reported as
     ``legacy_rows`` and skipped rather than treated as tampering.
     """
-    connection = _connect(db_path, ensure_schema=True)
-    try:
-        rows = connection.execute("SELECT * FROM audit_logs ORDER BY id ASC").fetchall()
-    finally:
-        connection.close()
-
     last_hash = GENESIS_HASH
     checked_rows = 0
     legacy_rows = 0
@@ -384,3 +380,19 @@ def verify_audit_chain(db_path: Path | str | None = None) -> dict[str, Any]:
         "broken_row_id": None,
         "broken_row": None,
     }
+
+
+def verify_audit_chain(db_path: Path | str | None = None) -> dict[str, Any]:
+    """Verify every hashed audit row against its predecessor.
+
+    Returns a result dictionary with ``verified``, counts, and the first broken
+    row (if any).  Rows written before hash support was added are reported as
+    ``legacy_rows`` and skipped rather than treated as tampering.
+    """
+    connection = _connect(db_path, ensure_schema=True)
+    try:
+        rows = connection.execute("SELECT * FROM audit_logs ORDER BY id ASC").fetchall()
+    finally:
+        connection.close()
+
+    return verify_rows([dict(row) for row in rows])

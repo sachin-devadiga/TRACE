@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -q
+
+  frontend:
+    name: Frontend build and UI tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check and build
+        run: npm run build
+
+      - name: Start the backend
+        working-directory: backend
+        env:
+          AUDITOR_DB_PATH: ${{ runner.temp }}/auditor.db
+          AUDITOR_CHECKPOINT_DB: ${{ runner.temp }}/checkpoints.db
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m uvicorn app.api:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health && break
+            sleep 2
+          done
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npx playwright test --project=live --reporter=line
+        env:
+          VITE_API_BASE: http://127.0.0.1:8000

@@ -31,6 +31,14 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      # MongoDB. Leave MONGO_URI empty to keep the local SQLite storage; set it
+      # to an Atlas connection string (mongodb+srv://...) to move the audit log
+      # and the workflow checkpoints into MongoDB. MONGO_DB_NAME defaults to
+      # "trace".
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: trace
       # SEC fair access: identify the caller on every request.
       - key: SEC_USER_AGENT
         value: MineArenaAuditor team@bietdavangere.edu

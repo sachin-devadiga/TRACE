@@ -23,10 +23,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.database import (
+from app.store import (
     AUDIT_DECISIONS,
     get_audit_logs,
     initialize_database,
+    list_thread_ids,
+    thread_exists,
     verify_audit_chain,
 )
 from app.edgar_client import TARGET_COMPANIES, normalize_cik
@@ -132,6 +134,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    # Any local port is allowed by default so the dev server (5173), the mock
+    # server (5174) and a locally served production build (4173) all work.
+    # Deployed origins still have to be listed in CORS_ORIGINS.
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -156,43 +162,12 @@ def _mark_thread_failed(graph: Any, thread_id: str) -> None:
 
 
 def _checkpoint_thread_ids() -> list[str]:
-    path = get_checkpoint_path()
-    if not path.exists():
-        return []
-    connection = sqlite3.connect(str(path))
-    try:
-        try:
-            rows = connection.execute(
-                """
-                SELECT thread_id, MAX(rowid) AS last_row
-                FROM checkpoints
-                GROUP BY thread_id
-                ORDER BY last_row DESC
-                """
-            ).fetchall()
-        except sqlite3.OperationalError:
-            return []
-        return [row[0] for row in rows]
-    finally:
-        connection.close()
+    """Return every audit thread that has stored checkpoint state."""
+    return list_thread_ids()
 
 
 def _thread_exists(thread_id: str) -> bool:
-    path = get_checkpoint_path()
-    if not path.exists():
-        return False
-    connection = sqlite3.connect(str(path))
-    try:
-        try:
-            row = connection.execute(
-                "SELECT 1 FROM checkpoints WHERE thread_id = ? LIMIT 1",
-                (thread_id,),
-            ).fetchone()
-        except sqlite3.OperationalError:
-            return False
-        return row is not None
-    finally:
-        connection.close()
+    return thread_exists(thread_id)
 
 
 def _interrupt_payload(snapshot: Any) -> dict[str, Any] | None:

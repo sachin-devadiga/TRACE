@@ -1,21 +1,30 @@
 # Runtime dependencies for the TRACE audit API (FastAPI + LangGraph).
 # The optional Streamlit workbench has its own file: requirements-streamlit.txt
+#
+# Versions are pinned so the deployed image is reproducible: the LangChain
+# packages must move together (langchain-core 1.x with langchain-openai 1.x and
+# langchain-google-genai 4.x).
 
-fastapi
-uvicorn[standard]
-pydantic
-python-dotenv
-requests
-beautifulsoup4
-lxml
+fastapi==0.162.5
+uvicorn[standard]==0.54.0
+pydantic==2.13.4
+python-dotenv==1.2.2
+requests==2.31.0
+beautifulsoup4==4.15.0
+lxml==6.1.1
 
 # LLM providers and the workflow engine
-langchain-google-genai
-langchain-openai
-langgraph
-langgraph-checkpoint-sqlite
-aiosqlite
-msgpack
+langchain-core==1.8.0
+langchain-openai==1.7.4
+langchain-google-genai==4.5.0
+langgraph==1.2.20
+langgraph-checkpoint-sqlite==3.1.3
+langgraph-checkpoint-mongodb==0.5.1
+aiosqlite==0.22.1
+msgpack==1.2.1
+
+# MongoDB (used when MONGO_URI is set; SQLite is the default)
+pymongo==4.20.0
 
 # Pinned because uuid-utils 0.19.0's native DLL is blocked by the Windows
 # Application Control policy on the development machine; 0.12.0 satisfies

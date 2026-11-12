@@ -234,6 +234,61 @@ npx playwright test e2e/production-build.spec.ts
 That test drives the built `dist/` folder — exactly what Render serves — against
 the live backend, including deep links.
 
+## MongoDB (optional, environment-driven)
+
+MongoDB is **off by default** — the app uses the local SQLite files. Set one
+environment variable and the storage switches over, with no code change:
+
+| Variable | Meaning |
+|---|---|
+| `MONGO_URI` | Connection string, e.g. `mongodb+srv://user:pass@cluster.mongodb.net` |
+| `MONGO_DB_NAME` | Database name (default `trace`) |
+| `MONGO_SERVER_SELECTION_TIMEOUT_MS` | How long to wait for a server (default `8000`) |
+
+When `MONGO_URI` is set:
+
+- the **append-only audit log** moves to the `audit_logs` collection, keeping the
+  same SHA-256 hash chain (`prev_hash` → `row_hash`) and the same verifier;
+- the **workflow checkpoints** move to the `checkpoints` / `checkpoint_writes`
+  collections via LangGraph's `MongoDBSaver`;
+- the API contract, the UI and the audit-log format are **unchanged** — a row
+  produced by MongoDB hashes identically to the same row produced by SQLite.
+
+Check which backend is live at any time: `GET /health` returns
+`{"status":"ok","version":"2.0.0","storage":"MongoDB (trace)"}`, and the
+**Settings** page shows the same value.
+
+### On Render
+
+The blueprint already declares `MONGO_URI` as a secret (`sync: false`), so:
+
+1. Open the `trace-backend` service → **Settings → Environment**.
+2. Paste your Atlas connection string into `MONGO_URI`.
+3. Save — the service restarts and picks up MongoDB.
+
+Nothing else changes: no rebuild, no config edit.
+
+### Atlas checklist
+
+- Allow Render's outbound IPs, or set the cluster's IP access list to `0.0.0.0/0`
+  for a demo (tighter for production).
+- Use a **Database User** with read/write on the `trace` database, not the
+  Atlas admin user.
+- Atlas needs TLS — the connection string already includes `mongodb+srv://`.
+
+### Notes
+
+- The audit-log writer serialises inserts with a process-level lock and keeps
+  the chain head in a single document. Run **one** backend instance (the Render
+  free tier is one instance). Multiple instances would need a distributed lock.
+- The MongoDB tests run against an in-process mock, so CI needs no server:
+
+```powershell
+cd "C:\Users\sachi\Videos\final TRACE\backend"
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -q        # 30 tests, no MongoDB required
+```
+
 ## Push to GitHub
 
 ```powershell

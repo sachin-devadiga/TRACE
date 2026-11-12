@@ -194,6 +194,8 @@ export interface AuditStatus {
 export interface HealthResponse {
   status: "ok" | "healthy" | "degraded";
   version: string;
+  /** Which storage backend the server is using, e.g. "MongoDB (trace)". */
+  storage?: string;
 }
 
 export interface StartAuditRequest {
