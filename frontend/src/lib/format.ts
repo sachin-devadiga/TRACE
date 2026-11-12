@@ -22,9 +22,17 @@ export function formatUsdCompact(value: number | null | undefined): string {
   return compactUsd.format(value);
 }
 
-export function formatPercent(value: number | null | undefined, digits = 1): string {
+export function formatPct(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return `${(value * 100).toFixed(digits)}%`;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "—";
+  // Clamp to reasonable range to prevent display bugs
+  const clamped = Math.max(0, Math.min(1000, num));
+  return `${clamped.toFixed(digits)}%`;
+}
+
+export function formatPercent(value: number | null | undefined, digits = 1): string {
+  return formatPct(value, digits);
 }
 
 export function formatRatio(value: number | null | undefined, digits = 2): string {
@@ -37,10 +45,20 @@ export function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
 
-/** Full USD with thousands separators: $394,327,000,000.00 */
+/** Full USD with thousands separators: $394,327,000,000 (no cents for values >= 1000) */
 export function formatUsdFull(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return fullUsd.format(value);
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "—";
+  if (Math.abs(num) >= 1000) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(num);
+  }
+  return fullUsd.format(num);
 }
 
 /** Compact form: $394.33B — used in dense tables. */

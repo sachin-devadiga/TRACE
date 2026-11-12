@@ -48,7 +48,7 @@ export function GuidedDemo() {
       });
       setDone((prev) => ({ ...prev, run: true }));
       setOpen(false);
-      toast.success("Demo audit started. It appears in the review queue when the filing is parsed.");
+      toast.success("Audit started. It appears in the review queue when the filing is parsed.");
       navigate(`/review?thread=${status.thread_id}`);
     } catch (error) {
       toast.error(

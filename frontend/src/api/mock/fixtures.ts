@@ -15,10 +15,12 @@ export interface CompanyFixture {
   industry: string;
   fiscal_year: number;
   period_end: string;
+  fiscalYearEnd?: string;
   filing_url: string;
   metrics: Metric[];
   flaggedItems: FlaggedItem[];
   xbrl: Record<string, number>;
+  isPlaceholder?: boolean;
 }
 
 function makeSignals(overrides: Partial<ConfidenceSignals> = {}): ConfidenceSignals {
@@ -55,7 +57,12 @@ interface MetricSeed {
 
 function makeMetric(seed: MetricSeed): Metric {
   const confidenceLabel = seed.confidence >= 0.85 ? "HIGH" : "LOW";
-  const compact = seed.value_usd >= 1e9 ? `$${(seed.value_usd / 1e9).toFixed(2)}B` : seed.value_usd >= 1e6 ? `$${(seed.value_usd / 1e6).toFixed(2)}M` : `$${seed.value_usd.toFixed(2)}`;
+  const compact =
+    seed.value_usd >= 1e9
+      ? `$${(seed.value_usd / 1e9).toFixed(2)}B`
+      : seed.value_usd >= 1e6
+        ? `$${(seed.value_usd / 1e6).toFixed(2)}M`
+        : `$${seed.value_usd.toFixed(2)}`;
   return {
     metric_name: seed.metric_name,
     value_usd: seed.value_usd,
@@ -66,7 +73,7 @@ function makeMetric(seed: MetricSeed): Metric {
     confidence: seed.confidence,
     confidence_label: confidenceLabel,
     confidence_signals: makeSignals(),
-    source_snippet: seed.source_snippet ?? `${seed.metric_name} from consolidated statements — ${compact}`,
+    source_snippet: seed.source_snippet ?? `${seed.metric_name} from consolidated statements — ${compact} (placeholder fixture)`,
     source_header: seed.source_header ?? "Consolidated Statements",
     source_row: seed.source_row ?? "FY",
     decision_state: seed.decision_state ?? "PENDING",
@@ -80,10 +87,17 @@ function flag(
   reasons: string[],
   rules: string[]
 ): FlaggedItem {
-  return { ...metric, reasons, rules, severity, escalation_types: escalationTypes };
+  return {
+    ...metric,
+    decision_state: "FLAGGED",
+    reasons,
+    rules,
+    severity,
+    escalation_types: escalationTypes,
+  };
 }
 
-export const FIXTURES: { companies: CompanyFixture[] } = {
+export const FIXTURES = {
   companies: [
     {
       name: "Apple Inc.",
@@ -91,8 +105,10 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
       cik: "0000320193",
       industry: "Technology",
       fiscal_year: 2025,
-      period_end: "2025-09-27",
-      filing_url: "https://www.sec.gov/Archives/edgar/data/320193/000032019525000106/aapl-20250928.htm",
+      period_end: "2025-09-27", // last Saturday of September 2025 (placeholder fixture)
+      fiscalYearEnd: "09-27", // last Saturday of September
+      filing_url: "https://www.sec.gov/Archives/edgar/data/320193/000032019325000106/aapl-20250927.htm",
+      isPlaceholder: true,
       metrics: [
         makeMetric({
           metric_name: "Revenue",
@@ -101,22 +117,18 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
           confidence: 0.78,
           unit: "USD",
           period: "FY2025",
-          source_snippet: "Revenue from Contracts with Customers — $434.60B",
-          source_header: "Consolidated Statements",
-          source_row: "FY2025",
+          source_snippet: "Revenue from Contracts with Customers — $434.60B (placeholder fixture)",
+          source_header: "Consolidated Statements of Operations",
+          source_row: "Net sales",
           decision_state: "FLAGGED",
-          severity: "HIGH",
-          escalation_types: ["EXTRACTION_RISK"],
-          reasons: ["Revenue concept resolved via secondary statement", "Low snippet grounding for revenue recognition boundary"],
-          rules: ["CONCEPT_SYNONYM", "SNIPPET_BOUNDARY"],
         }),
-        makeMetric({ metric_name: "Net Income", value_usd: 112300000000, prior_year_value_usd: 88700000000, confidence: 0.96, period: "FY2025" }),
-        makeMetric({ metric_name: "Total Assets", value_usd: 396400000000, prior_year_value_usd: 365200000000, confidence: 0.93, period: "FY2025" }),
-        makeMetric({ metric_name: "Total Liabilities", value_usd: 304400000000, prior_year_value_usd: 283800000000, confidence: 0.9, period: "FY2025" }),
-        makeMetric({ metric_name: "Shareholders' Equity", value_usd: 92600000000, prior_year_value_usd: 81000000000, confidence: 0.88, period: "FY2025" }),
-        makeMetric({ metric_name: "Operating Cash Flow", value_usd: 118300000000, prior_year_value_usd: 108800000000, confidence: 0.91, period: "FY2025" }),
-        makeMetric({ metric_name: "Cash and Cash Equivalents", value_usd: 61100000000, prior_year_value_usd: 55200000000, confidence: 0.89, period: "FY2025" }),
-        makeMetric({ metric_name: "Research and Development", value_usd: 31200000000, prior_year_value_usd: 26900000000, confidence: 0.9, period: "FY2025" }),
+        makeMetric({ metric_name: "Net Income", value_usd: 96700000000, prior_year_value_usd: 93700000000, confidence: 0.93, period: "FY2025" }),
+        makeMetric({ metric_name: "Total Assets", value_usd: 352800000000, prior_year_value_usd: 364980000000, confidence: 0.94, period: "FY2025" }),
+        makeMetric({ metric_name: "Total Liabilities", value_usd: 287000000000, prior_year_value_usd: 290000000000, confidence: 0.93, period: "FY2025" }),
+        makeMetric({ metric_name: "Shareholders' Equity", value_usd: 65800000000, prior_year_value_usd: 74980000000, confidence: 0.92, period: "FY2025" }),
+        makeMetric({ metric_name: "Operating Cash Flow", value_usd: 122000000000, prior_year_value_usd: 110500000000, confidence: 0.91, period: "FY2025" }),
+        makeMetric({ metric_name: "Cash and Cash Equivalents", value_usd: 29900000000, prior_year_value_usd: 30700000000, confidence: 0.9, period: "FY2025" }),
+        makeMetric({ metric_name: "Research and Development", value_usd: 30300000000, prior_year_value_usd: 29900000000, confidence: 0.92, period: "FY2025" }),
       ],
       flaggedItems: [
         flag(
@@ -127,15 +139,51 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
             confidence: 0.78,
             unit: "USD",
             period: "FY2025",
-            source_snippet: "Revenue from Contracts with Customers — $434.60B",
-            source_header: "Consolidated Statements",
-            source_row: "FY2025",
+            source_snippet: "Revenue from Contracts with Customers — $434.60B (placeholder fixture)",
+            source_header: "Consolidated Statements of Operations",
+            source_row: "Net sales",
             decision_state: "FLAGGED",
           }),
           "HIGH",
           ["EXTRACTION_RISK"],
           ["Revenue concept resolved via secondary statement", "Low snippet grounding for revenue recognition boundary"],
           ["CONCEPT_SYNONYM", "SNIPPET_BOUNDARY"]
+        ),
+        flag(
+          makeMetric({
+            metric_name: "Net Income",
+            value_usd: 96700000000,
+            prior_year_value_usd: 93700000000,
+            confidence: 0.81,
+            unit: "USD",
+            period: "FY2025",
+            source_snippet: "Net income — $96.70B (placeholder fixture)",
+            source_header: "Consolidated Statements of Operations",
+            source_row: "Net income",
+            decision_state: "FLAGGED",
+          }),
+          "HIGH",
+          ["FINANCIAL_ANOMALY"],
+          ["Net income margin deviation exceeds tolerance", "Year-over-year change requires review"],
+          ["YOY_TOLERANCE", "MARGIN_ANOMALY"]
+        ),
+        flag(
+          makeMetric({
+            metric_name: "Total Assets",
+            value_usd: 352800000000,
+            prior_year_value_usd: 364980000000,
+            confidence: 0.82,
+            unit: "USD",
+            period: "FY2025",
+            source_snippet: "Total assets — $352.80B (placeholder fixture)",
+            source_header: "Consolidated Balance Sheets",
+            source_row: "Total assets",
+            decision_state: "FLAGGED",
+          }),
+          "MEDIUM",
+          ["EXTRACTION_RISK"],
+          ["Balance sheet classification requires verification"],
+          ["STATEMENT_CROSSCHECK"]
         ),
       ],
       xbrl: {
@@ -155,8 +203,10 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
       cik: "0000789019",
       industry: "Technology",
       fiscal_year: 2025,
-      period_end: "2025-08-28",
-      filing_url: "https://www.sec.gov/Archives/edgar/data/789019/000078901925000106/msft-20250828.htm",
+      period_end: "2025-06-30",
+      fiscalYearEnd: "06-30",
+      filing_url: "https://www.sec.gov/Archives/edgar/data/789019/000078901925000106/msft-20250630.htm",
+      isPlaceholder: true,
       metrics: [
         makeMetric({ metric_name: "Revenue", value_usd: 254600000000, prior_year_value_usd: 236900000000, confidence: 0.96, period: "FY2025" }),
         makeMetric({ metric_name: "Net Income", value_usd: 102200000000, prior_year_value_usd: 88000000000, confidence: 0.94, period: "FY2025" }),
@@ -185,8 +235,10 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
       cik: "0001045810",
       industry: "Semiconductors",
       fiscal_year: 2025,
-      period_end: "2025-09-28",
-      filing_url: "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000106/nvidia-20250928.htm",
+      period_end: "2025-01-26", // last Sunday of January 2025 (placeholder fixture)
+      fiscalYearEnd: "01-26",
+      filing_url: "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000106/nvidia-20250126.htm",
+      isPlaceholder: true,
       metrics: [
         makeMetric({ metric_name: "Revenue", value_usd: 68000000000, prior_year_value_usd: 60000000000, confidence: 0.97, period: "FY2025" }),
         makeMetric({ metric_name: "Net Income", value_usd: 26700000000, prior_year_value_usd: 19600000000, confidence: 0.98, period: "FY2025" }),
@@ -212,11 +264,13 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
     {
       name: "Tesla, Inc.",
       ticker: "TSLA",
-      cik: "0001318609",
+      cik: "0001318605",
       industry: "Consumer Discretionary",
       fiscal_year: 2025,
       period_end: "2025-12-31",
-      filing_url: "https://www.sec.gov/Archives/edgar/data/1318609/000131860925000012/tsla-20251231.htm",
+      fiscalYearEnd: "12-31",
+      filing_url: "https://www.sec.gov/Archives/edgar/data/1318605/000131860525000012/tsla-20251231.htm",
+      isPlaceholder: true,
       metrics: [
         makeMetric({
           metric_name: "Revenue",
@@ -225,10 +279,6 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
           confidence: 0.9,
           period: "FY2025",
           decision_state: "FLAGGED",
-          severity: "HIGH",
-          escalation_types: ["FINANCIAL_ANOMALY"],
-          reasons: ["FY2025 revenue increase of 10.2% vs. FY2024 requires manual review", "Delivery-based revenue recognition variance"],
-          rules: ["YOY_TOLERANCE", "REVENUE_REC"],
         }),
         makeMetric({ metric_name: "Net Income", value_usd: 18500000000, prior_year_value_usd: 14600000000, confidence: 0.88, period: "FY2025" }),
         makeMetric({ metric_name: "Total Assets", value_usd: 238000000000, prior_year_value_usd: 232000000000, confidence: 0.87, period: "FY2025" }),
@@ -272,85 +322,54 @@ export const FIXTURES: { companies: CompanyFixture[] } = {
       industry: "Consumer Discretionary",
       fiscal_year: 2025,
       period_end: "2025-12-31",
-      filing_url: "https://www.sec.gov/Archives/edgar/data/1018724/000101872525000106/amzn-20251231.htm",
+      fiscalYearEnd: "12-31",
+      filing_url: "https://www.sec.gov/Archives/edgar/data/1018724/000101872425000029/amzn-20251231.htm",
+      isPlaceholder: true,
       metrics: [
-        makeMetric({ metric_name: "Revenue", value_usd: 575000000000, prior_year_value_usd: 574000000000, confidence: 0.95, period: "FY2025" }),
-        makeMetric({ metric_name: "Net Income", value_usd: 68000000000, prior_year_value_usd: 59000000000, confidence: 0.93, period: "FY2025" }),
-        makeMetric({ metric_name: "Total Assets", value_usd: 780000000000, prior_year_value_usd: 725000000000, confidence: 0.92, period: "FY2025" }),
-        makeMetric({ metric_name: "Total Liabilities", value_usd: 660000000000, prior_year_value_usd: 612000000000, confidence: 0.91, period: "FY2025" }),
-        makeMetric({ metric_name: "Shareholders' Equity", value_usd: 120000000000, prior_year_value_usd: 113000000000, confidence: 0.9, period: "FY2025" }),
-        makeMetric({
-          metric_name: "Operating Cash Flow",
-          value_usd: 140000000000,
-          prior_year_value_usd: 140000000000,
-          confidence: 0.72,
-          period: "FY2025",
-          decision_state: "FLAGGED",
-          severity: "MEDIUM",
-          escalation_types: ["EXTRACTION_RISK"],
-          reasons: ["Cash flow statement row missing operating cash flow line item", "Period-over-period sanity check failed"],
-          rules: ["ROW_PRESENCE", "PERIOD_SANITY"],
-        }),
-        makeMetric({ metric_name: "Cash and Cash Equivalents", value_usd: 105000000000, prior_year_value_usd: 93500000000, confidence: 0.9, period: "FY2025" }),
-        makeMetric({ metric_name: "Research and Development", value_usd: 46000000000, prior_year_value_usd: 42000000000, confidence: 0.9, period: "FY2025" }),
+        makeMetric({ metric_name: "Revenue", value_usd: 637900000000, prior_year_value_usd: 574800000000, confidence: 0.95, period: "FY2025" }),
+        makeMetric({ metric_name: "Net Income", value_usd: 59300000000, prior_year_value_usd: 39200000000, confidence: 0.94, period: "FY2025" }),
+        makeMetric({ metric_name: "Total Assets", value_usd: 624800000000, prior_year_value_usd: 531000000000, confidence: 0.93, period: "FY2025" }),
+        makeMetric({ metric_name: "Total Liabilities", value_usd: 316000000000, prior_year_value_usd: 285000000000, confidence: 0.92, period: "FY2025" }),
+        makeMetric({ metric_name: "Shareholders' Equity", value_usd: 308800000000, prior_year_value_usd: 246000000000, confidence: 0.93, period: "FY2025" }),
+        makeMetric({ metric_name: "Operating Cash Flow", value_usd: 115900000000, prior_year_value_usd: 84700000000, confidence: 0.93, period: "FY2025" }),
+        makeMetric({ metric_name: "Cash and Cash Equivalents", value_usd: 78700000000, prior_year_value_usd: 73300000000, confidence: 0.92, period: "FY2025" }),
+        makeMetric({ metric_name: "Research and Development", value_usd: 88500000000, prior_year_value_usd: 85700000000, confidence: 0.93, period: "FY2025" }),
       ],
-      flaggedItems: [
-        flag(
-          makeMetric({
-            metric_name: "Operating Cash Flow",
-            value_usd: 140000000000,
-            prior_year_value_usd: 140000000000,
-            confidence: 0.72,
-            period: "FY2025",
-            decision_state: "FLAGGED",
-            severity: "MEDIUM",
-          }),
-          "MEDIUM",
-          ["EXTRACTION_RISK"],
-          ["Cash flow statement row missing operating cash flow line item", "Period-over-period sanity check failed"],
-          ["ROW_PRESENCE", "PERIOD_SANITY"],
-        ),
-      ],
+      flaggedItems: [],
       xbrl: {
-        Revenue: 575000000000,
-        "Net Income": 68000000000,
-        "Total Assets": 780000000000,
-        "Total Liabilities": 660000000000,
-        "Shareholders' Equity": 120000000000,
-        "Operating Cash Flow": 140000000000,
-        "Cash and Cash Equivalents": 105000000000,
-        "Research and Development": 46000000000,
+        Revenue: 637900000000,
+        "Net Income": 59300000000,
+        "Total Assets": 624800000000,
+        "Total Liabilities": 316000000000,
+        "Shareholders' Equity": 308800000000,
+        "Operating Cash Flow": 115900000000,
+        "Cash and Cash Equivalents": 78700000000,
+        "Research and Development": 88500000000,
       },
     },
-  ],
+  ] as CompanyFixture[],
 };
 
 export function findCompanyByCik(cik: string): CompanyFixture {
-  const clean = cik.replace(/[^0-9]/g, "");
-  return FIXTURES.companies.find((c) => c.cik.replace(/[^0-9]/g, "") === clean) ?? FIXTURES.companies[0];
+  const match = FIXTURES.companies.find((c) => c.cik === cik);
+  if (!match) throw new Error(`Unknown company ${cik}`);
+  return match;
 }
 
 export function trueValueFor(company: CompanyFixture, metricName: string): number {
-  const key = Object.keys(company.xbrl).find((k) => k.toLowerCase() === metricName.toLowerCase());
-  if (key) return company.xbrl[key];
-  const fallback = company.metrics.find((m) => m.metric_name.toLowerCase() === metricName.toLowerCase());
-  return fallback ? fallback.value_usd : 0;
+  return company.xbrl[metricName] ?? 0;
 }
 
-export function flaggedForCompany(cik: string): FlaggedItem[] {
-  const company = findCompanyByCik(cik);
+export function flaggedForCompany(company: CompanyFixture): FlaggedItem[] {
   return company.flaggedItems;
 }
 
-export function buildAnomalyExplanation(flagged: FlaggedItem): AnomalyExplanation {
-  const primary = flagged.escalation_types[0] ?? "EXTRACTION_RISK";
-  const detail =
-    flagged.reasons[0] ??
-    "Flagged by automated validation. Manual review required before release.";
+export function buildAnomalyExplanation(metric: FlaggedItem): AnomalyExplanation {
+  const isExtraction = metric.escalation_types.includes("EXTRACTION_RISK");
   return {
-    metric_name: flagged.metric_name,
-    title: `${flagged.metric_name} flagged as ${primary.replace(/_/g, " ")}`,
-    detail,
-    severity: flagged.severity,
+    metric_name: metric.metric_name,
+    title: isExtraction ? "Extraction risk" : "Financial anomaly",
+    detail: metric.reasons.join("; "),
+    severity: metric.severity,
   };
 }

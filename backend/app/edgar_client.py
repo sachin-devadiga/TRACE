@@ -820,12 +820,31 @@ def _normalized_metric(
     }
 
 
-def fetch_xbrl_ground_truth(cik: str) -> dict[str, Any]:
+def fetch_xbrl_ground_truth(cik: str, accession: str | None = None) -> dict[str, Any]:
     """Return US-GAAP facts for the latest annual 10-K, in USD millions."""
     cik = normalize_cik(cik)
     submissions = _submissions(cik)
-    filing = _latest_10k_filing(submissions)
-    accession = filing["accession_number"]
+    filing = _latest_10k_filing(submissions) if accession is None else None
+    if accession is None and filing is not None:
+        accession = filing["accession_number"]
+        filing_date = filing["filing_date"]
+        report_date = filing["report_date"]
+    else:
+        # Find filing details for given accession
+        recent = submissions.get("filings", {}).get("recent", {})
+        forms = recent.get("form", [])
+        accessions = recent.get("accessionNumber", [])
+        filing_dates = recent.get("filingDate", [])
+        report_dates = recent.get("reportDate", [])
+        filing_date = None
+        report_date = None
+        for i, acc in enumerate(accessions):
+            if acc == accession or acc.replace("-", "") == str(accession).replace("-", ""):
+                filing_date = filing_dates[i] if i < len(filing_dates) else None
+                report_date = report_dates[i] if i < len(report_dates) else None
+                break
+        if filing_date is None:
+            filing_date = report_date
 
     facts = _company_facts(cik).get("facts", {}).get("us-gaap", {})
     if not facts:
@@ -877,7 +896,7 @@ def fetch_xbrl_ground_truth(cik: str) -> dict[str, Any]:
                 "raw_value": assets["raw_value"] - equity["raw_value"],
                 "raw_unit": "USD",
                 "accession_number": accession,
-                "filed": filing["filing_date"],
+                "filed": filing_date,
                 "fy": assets.get("fy"),
                 "fp": "FY",
                 "frame": None,
@@ -894,7 +913,7 @@ def fetch_xbrl_ground_truth(cik: str) -> dict[str, Any]:
         "fiscal_year": f"FY{period_end[:4]}",
         "period_end": period_end,
         "accession_number": accession,
-        "filing_date": filing["filing_date"],
+        "filing_date": filing_date,
         "source": "SEC XBRL company facts (US-GAAP), normalized to USD millions",
         "unit": "USD Millions",
         "metrics": metrics,

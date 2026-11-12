@@ -168,13 +168,13 @@ export function NewAuditPage() {
             </div>
             <div className="flex items-center justify-between rounded-xl border p-4">
               <div>
-                <div className="text-sm font-medium">Mark as demo run</div>
+                <div className="text-sm font-medium">Mark as test run</div>
                 <div className="text-xs text-muted-foreground">
-                  Tags this audit as a demo. Demo runs are excluded from the headline accuracy and escalation metrics so
-                  they never distort the official numbers.
+                  Tags this audit as a test run. Test runs are excluded from the headline accuracy and escalation metrics
+                  so they never distort the official numbers.
                 </div>
               </div>
-              <Switch checked={demoOnly} onCheckedChange={setDemoOnly} aria-label="Mark as demo run" />
+              <Switch checked={demoOnly} onCheckedChange={setDemoOnly} aria-label="Mark as test run" />
             </div>
           </CardContent>
         </Card>
@@ -188,7 +188,7 @@ export function NewAuditPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               {threadStatus ? <StatusBadge status={threadStatus.status} /> : <Badge variant="secondary">Starting…</Badge>}
-              {threadStatus?.demo_only ? <Badge variant="outline">Demo preset</Badge> : null}
+              {threadStatus?.demo_only ? <Badge variant="outline">Preset</Badge> : null}
             </div>
             <WorkflowStepper status={threadStatus?.status ?? "STARTED"} />
             {threadStatus?.status === "PAUSED_FOR_REVIEW" ? (

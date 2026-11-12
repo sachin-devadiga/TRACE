@@ -9,7 +9,8 @@
     "preview": "vite preview --port 4173",
     "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "fetch:sec": "node ../scripts/fetch-sec-fixtures.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.1.0",

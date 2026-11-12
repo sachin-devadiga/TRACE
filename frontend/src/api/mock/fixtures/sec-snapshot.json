@@ -1,0 +1,506 @@
+{
+  "retrieved_at": "2026-11-12T23:39:32.472Z",
+  "companies": {
+    "AAPL": {
+      "name": "Apple Inc.",
+      "ticker": "AAPL",
+      "cik": "0000320193",
+      "fiscalYearEnd": "09-27",
+      "fiscal_year": 2026,
+      "period_end": "2025-09-27",
+      "accession_number": "0000320193-26-000026",
+      "filed_date": "2026-11-03",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000026/",
+      "metrics": {
+        "Revenue": {
+          "value_usd": 391035000000,
+          "prior_year_value_usd": 416161000000,
+          "xbrl_tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "derived": false,
+          "period_start": "2023-10-01",
+          "period_end": "2024-09-28"
+        },
+        "Net Income": {
+          "value_usd": 93736000000,
+          "prior_year_value_usd": 112010000000,
+          "xbrl_tag": "NetIncomeLoss",
+          "derived": false,
+          "period_start": "2023-10-01",
+          "period_end": "2024-09-28"
+        },
+        "Total Assets": {
+          "value_usd": 359241000000,
+          "prior_year_value_usd": 359241000000,
+          "xbrl_tag": "Assets",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-09-27"
+        },
+        "Total Liabilities": {
+          "value_usd": 285508000000,
+          "prior_year_value_usd": 285508000000,
+          "xbrl_tag": "Liabilities",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-09-27"
+        },
+        "Shareholders' Equity": {
+          "value_usd": 62146000000,
+          "prior_year_value_usd": 73733000000,
+          "xbrl_tag": "StockholdersEquity",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2023-09-30"
+        },
+        "Operating Cash Flow": {
+          "value_usd": 118254000000,
+          "prior_year_value_usd": 111482000000,
+          "xbrl_tag": "NetCashProvidedByUsedInOperatingActivities",
+          "derived": false,
+          "period_start": "2023-10-01",
+          "period_end": "2024-09-28"
+        },
+        "Cash and Cash Equivalents": {
+          "value_usd": 35934000000,
+          "prior_year_value_usd": 35934000000,
+          "xbrl_tag": "CashAndCashEquivalentsAtCarryingValue",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-09-27"
+        },
+        "R&D Expense": {
+          "value_usd": 31370000000,
+          "prior_year_value_usd": 34550000000,
+          "xbrl_tag": "ResearchAndDevelopmentExpense",
+          "derived": false,
+          "period_start": "2023-10-01",
+          "period_end": "2024-09-28"
+        }
+      },
+      "report": {
+        "tagUsed": {
+          "Revenue": "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "Net Income": "NetIncomeLoss",
+          "Total Assets": "Assets",
+          "Total Liabilities": "Liabilities",
+          "Shareholders' Equity": "StockholdersEquity",
+          "Operating Cash Flow": "NetCashProvidedByUsedInOperatingActivities",
+          "Cash and Cash Equivalents": "CashAndCashEquivalentsAtCarryingValue",
+          "R&D Expense": "ResearchAndDevelopmentExpense"
+        },
+        "derived": {
+          "Revenue": false,
+          "Net Income": false,
+          "Total Assets": false,
+          "Total Liabilities": false,
+          "Shareholders' Equity": false,
+          "Operating Cash Flow": false,
+          "Cash and Cash Equivalents": false,
+          "R&D Expense": false
+        },
+        "missing": []
+      }
+    },
+    "MSFT": {
+      "name": "Microsoft Corporation",
+      "ticker": "MSFT",
+      "cik": "0000789019",
+      "fiscalYearEnd": "06-30",
+      "fiscal_year": 2026,
+      "period_end": "2025-06-30",
+      "accession_number": "0001193125-26-323660",
+      "filed_date": "2026-07-29",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/",
+      "metrics": {
+        "Revenue": {
+          "value_usd": 281724000000,
+          "prior_year_value_usd": 281724000000,
+          "xbrl_tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "derived": false,
+          "period_start": "2024-07-01",
+          "period_end": "2025-06-30"
+        },
+        "Net Income": {
+          "value_usd": 101832000000,
+          "prior_year_value_usd": 101832000000,
+          "xbrl_tag": "NetIncomeLoss",
+          "derived": false,
+          "period_start": "2024-07-01",
+          "period_end": "2025-06-30"
+        },
+        "Total Assets": {
+          "value_usd": 619003000000,
+          "prior_year_value_usd": 619003000000,
+          "xbrl_tag": "Assets",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-06-30"
+        },
+        "Total Liabilities": {
+          "value_usd": 275524000000,
+          "prior_year_value_usd": 275524000000,
+          "xbrl_tag": "Liabilities",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-06-30"
+        },
+        "Shareholders' Equity": {
+          "value_usd": 268477000000,
+          "prior_year_value_usd": 343479000000,
+          "xbrl_tag": "StockholdersEquity",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2024-06-30"
+        },
+        "Operating Cash Flow": {
+          "value_usd": 136162000000,
+          "prior_year_value_usd": 136162000000,
+          "xbrl_tag": "NetCashProvidedByUsedInOperatingActivities",
+          "derived": false,
+          "period_start": "2024-07-01",
+          "period_end": "2025-06-30"
+        },
+        "Cash and Cash Equivalents": {
+          "value_usd": 30242000000,
+          "prior_year_value_usd": 30242000000,
+          "xbrl_tag": "CashAndCashEquivalentsAtCarryingValue",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-06-30"
+        },
+        "R&D Expense": {
+          "value_usd": 32488000000,
+          "prior_year_value_usd": 32488000000,
+          "xbrl_tag": "ResearchAndDevelopmentExpense",
+          "derived": false,
+          "period_start": "2024-07-01",
+          "period_end": "2025-06-30"
+        }
+      },
+      "report": {
+        "tagUsed": {
+          "Revenue": "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "Net Income": "NetIncomeLoss",
+          "Total Assets": "Assets",
+          "Total Liabilities": "Liabilities",
+          "Shareholders' Equity": "StockholdersEquity",
+          "Operating Cash Flow": "NetCashProvidedByUsedInOperatingActivities",
+          "Cash and Cash Equivalents": "CashAndCashEquivalentsAtCarryingValue",
+          "R&D Expense": "ResearchAndDevelopmentExpense"
+        },
+        "derived": {
+          "Revenue": false,
+          "Net Income": false,
+          "Total Assets": false,
+          "Total Liabilities": false,
+          "Shareholders' Equity": false,
+          "Operating Cash Flow": false,
+          "Cash and Cash Equivalents": false,
+          "R&D Expense": false
+        },
+        "missing": []
+      }
+    },
+    "NVDA": {
+      "name": "NVIDIA Corporation",
+      "ticker": "NVDA",
+      "cik": "0001045810",
+      "fiscalYearEnd": "01-26",
+      "fiscal_year": 2026,
+      "period_end": "2025-01-26",
+      "accession_number": "0001045810-26-000021",
+      "filed_date": "2026-02-25",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/",
+      "metrics": {
+        "Revenue": {
+          "value_usd": 60922000000,
+          "prior_year_value_usd": 130497000000,
+          "xbrl_tag": "Revenues",
+          "derived": false,
+          "period_start": "2023-01-30",
+          "period_end": "2024-01-28"
+        },
+        "Net Income": {
+          "value_usd": 29760000000,
+          "prior_year_value_usd": 72880000000,
+          "xbrl_tag": "NetIncomeLoss",
+          "derived": false,
+          "period_start": "2023-01-30",
+          "period_end": "2024-01-28"
+        },
+        "Total Assets": {
+          "value_usd": 111601000000,
+          "prior_year_value_usd": 111601000000,
+          "xbrl_tag": "Assets",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-01-26"
+        },
+        "Total Liabilities": {
+          "value_usd": 32274000000,
+          "prior_year_value_usd": 32274000000,
+          "xbrl_tag": "Liabilities",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-01-26"
+        },
+        "Shareholders' Equity": {
+          "value_usd": 22101000000,
+          "prior_year_value_usd": 79327000000,
+          "xbrl_tag": "StockholdersEquity",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2023-01-29"
+        },
+        "Operating Cash Flow": {
+          "value_usd": 28090000000,
+          "prior_year_value_usd": 64089000000,
+          "xbrl_tag": "NetCashProvidedByUsedInOperatingActivities",
+          "derived": false,
+          "period_start": "2023-01-30",
+          "period_end": "2024-01-28"
+        },
+        "Cash and Cash Equivalents": {
+          "value_usd": 8589000000,
+          "prior_year_value_usd": 8589000000,
+          "xbrl_tag": "CashAndCashEquivalentsAtCarryingValue",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2025-01-26"
+        },
+        "R&D Expense": {
+          "value_usd": 8675000000,
+          "prior_year_value_usd": 12914000000,
+          "xbrl_tag": "ResearchAndDevelopmentExpense",
+          "derived": false,
+          "period_start": "2023-01-30",
+          "period_end": "2024-01-28"
+        }
+      },
+      "report": {
+        "tagUsed": {
+          "Revenue": "Revenues",
+          "Net Income": "NetIncomeLoss",
+          "Total Assets": "Assets",
+          "Total Liabilities": "Liabilities",
+          "Shareholders' Equity": "StockholdersEquity",
+          "Operating Cash Flow": "NetCashProvidedByUsedInOperatingActivities",
+          "Cash and Cash Equivalents": "CashAndCashEquivalentsAtCarryingValue",
+          "R&D Expense": "ResearchAndDevelopmentExpense"
+        },
+        "derived": {
+          "Revenue": false,
+          "Net Income": false,
+          "Total Assets": false,
+          "Total Liabilities": false,
+          "Shareholders' Equity": false,
+          "Operating Cash Flow": false,
+          "Cash and Cash Equivalents": false,
+          "R&D Expense": false
+        },
+        "missing": []
+      }
+    },
+    "TSLA": {
+      "name": "Tesla, Inc.",
+      "ticker": "TSLA",
+      "cik": "0001318605",
+      "fiscalYearEnd": "12-31",
+      "fiscal_year": 2025,
+      "period_end": "2024-12-31",
+      "accession_number": "0001628280-26-003952",
+      "filed_date": "2026-01-29",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026003952/",
+      "metrics": {
+        "Revenue": {
+          "value_usd": 96773000000,
+          "prior_year_value_usd": 97690000000,
+          "xbrl_tag": "Revenues",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        },
+        "Net Income": {
+          "value_usd": 14997000000,
+          "prior_year_value_usd": 7091000000,
+          "xbrl_tag": "NetIncomeLoss",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        },
+        "Total Assets": {
+          "value_usd": 122070000000,
+          "prior_year_value_usd": 122070000000,
+          "xbrl_tag": "Assets",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2024-12-31"
+        },
+        "Total Liabilities": {
+          "value_usd": 48390000000,
+          "prior_year_value_usd": 48390000000,
+          "xbrl_tag": "Liabilities",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2024-12-31"
+        },
+        "Shareholders' Equity": {
+          "value_usd": 72913000000,
+          "prior_year_value_usd": 72913000000,
+          "xbrl_tag": "StockholdersEquity",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2024-12-31"
+        },
+        "Operating Cash Flow": {
+          "value_usd": 13256000000,
+          "prior_year_value_usd": 14923000000,
+          "xbrl_tag": "NetCashProvidedByUsedInOperatingActivities",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        },
+        "Cash and Cash Equivalents": {
+          "value_usd": 16398000000,
+          "prior_year_value_usd": 16139000000,
+          "xbrl_tag": "CashAndCashEquivalentsAtCarryingValue",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2023-12-31"
+        },
+        "R&D Expense": {
+          "value_usd": 3969000000,
+          "prior_year_value_usd": 4540000000,
+          "xbrl_tag": "ResearchAndDevelopmentExpense",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        }
+      },
+      "report": {
+        "tagUsed": {
+          "Revenue": "Revenues",
+          "Net Income": "NetIncomeLoss",
+          "Total Assets": "Assets",
+          "Total Liabilities": "Liabilities",
+          "Shareholders' Equity": "StockholdersEquity",
+          "Operating Cash Flow": "NetCashProvidedByUsedInOperatingActivities",
+          "Cash and Cash Equivalents": "CashAndCashEquivalentsAtCarryingValue",
+          "R&D Expense": "ResearchAndDevelopmentExpense"
+        },
+        "derived": {
+          "Revenue": false,
+          "Net Income": false,
+          "Total Assets": false,
+          "Total Liabilities": false,
+          "Shareholders' Equity": false,
+          "Operating Cash Flow": false,
+          "Cash and Cash Equivalents": false,
+          "R&D Expense": false
+        },
+        "missing": []
+      }
+    },
+    "AMZN": {
+      "name": "Amazon.com, Inc.",
+      "ticker": "AMZN",
+      "cik": "0001018724",
+      "fiscalYearEnd": "12-31",
+      "fiscal_year": 2025,
+      "period_end": "2024-12-31",
+      "accession_number": "0001018724-26-000004",
+      "filed_date": "2026-02-06",
+      "filing_index_url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000004/",
+      "metrics": {
+        "Revenue": {
+          "value_usd": 574785000000,
+          "prior_year_value_usd": 637959000000,
+          "xbrl_tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        },
+        "Net Income": {
+          "value_usd": 30425000000,
+          "prior_year_value_usd": 59248000000,
+          "xbrl_tag": "NetIncomeLoss",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        },
+        "Total Assets": {
+          "value_usd": 527854000000,
+          "prior_year_value_usd": 624894000000,
+          "xbrl_tag": "Assets",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2023-12-31"
+        },
+        "Total Liabilities": {
+          "value_usd": 381811000000,
+          "prior_year_value_usd": 338924000000,
+          "xbrl_tag": "LiabilitiesAndStockholdersEquity - StockholdersEquity",
+          "derived": true,
+          "period_start": null,
+          "period_end": "2023-12-31"
+        },
+        "Shareholders' Equity": {
+          "value_usd": 146043000000,
+          "prior_year_value_usd": 285970000000,
+          "xbrl_tag": "StockholdersEquity",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2022-12-31"
+        },
+        "Operating Cash Flow": {
+          "value_usd": 84946000000,
+          "prior_year_value_usd": 115877000000,
+          "xbrl_tag": "NetCashProvidedByUsedInOperatingActivities",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31"
+        },
+        "Cash and Cash Equivalents": {
+          "value_usd": 78779000000,
+          "prior_year_value_usd": 78779000000,
+          "xbrl_tag": "CashAndCashEquivalentsAtCarryingValue",
+          "derived": false,
+          "period_start": null,
+          "period_end": "2024-12-31"
+        },
+        "R&D Expense": {
+          "value_usd": 36852000000,
+          "prior_year_value_usd": 68593000000,
+          "xbrl_tag": "OperatingIncomeLoss",
+          "derived": false,
+          "period_start": "2023-01-01",
+          "period_end": "2023-12-31",
+          "relabeled_from": "OperatingIncomeLoss"
+        }
+      },
+      "report": {
+        "tagUsed": {
+          "Revenue": "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "Net Income": "NetIncomeLoss",
+          "Total Assets": "Assets",
+          "Total Liabilities": "Derived (LiabilitiesAndStockholdersEquity - StockholdersEquity)",
+          "Shareholders' Equity": "StockholdersEquity",
+          "Operating Cash Flow": "NetCashProvidedByUsedInOperatingActivities",
+          "Cash and Cash Equivalents": "CashAndCashEquivalentsAtCarryingValue",
+          "R&D Expense": "OperatingIncomeLoss (relabelled)"
+        },
+        "derived": {
+          "Revenue": false,
+          "Net Income": false,
+          "Total Assets": false,
+          "Total Liabilities": true,
+          "Shareholders' Equity": false,
+          "Operating Cash Flow": false,
+          "Cash and Cash Equivalents": false,
+          "R&D Expense": false
+        },
+        "missing": []
+      }
+    }
+  }
+}

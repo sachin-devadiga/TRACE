@@ -52,7 +52,7 @@ export function SettingsPage() {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm">Current mode</span>
-            <Badge variant={mode === "mock" ? "warning" : "success"}>{mode === "mock" ? "Demo data" : "Live"}</Badge>
+            <Badge variant={mode === "mock" ? "warning" : "success"}>{mode === "mock" ? "SEC snapshot" : "Live"}</Badge>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm">Connection status</span>
@@ -93,7 +93,7 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Demo controls</CardTitle>
+          <CardTitle>Controls</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -187,10 +187,10 @@ export function SettingsPage() {
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium">Reset demo data</div>
+              <div className="text-sm font-medium">Reset data</div>
               <div className="text-xs text-muted-foreground">
-                Clears every audit thread from the workflow store and re-seeds the deterministic demo threads. The
-                append-only audit log is never deleted — it is the permanent record of what was decided.
+                Clears every audit thread from the workflow store. The append-only audit log is never deleted — it is
+                the permanent record of what was decided.
               </div>
             </div>
             <Button variant="destructive" size="sm" onClick={() => setConfirmReset(true)}>
@@ -203,10 +203,10 @@ export function SettingsPage() {
       <Dialog open={confirmReset} onOpenChange={setConfirmReset}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset demo data?</DialogTitle>
+            <DialogTitle>Reset data?</DialogTitle>
             <DialogDescription>
-              This removes every audit thread from the workflow store and restores the deterministic demo threads. The
-              append-only audit log is kept as the permanent record. This cannot be undone.
+              This removes every audit thread from the workflow store. The append-only audit log is kept as the permanent
+              record. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -220,7 +220,7 @@ export function SettingsPage() {
                   .mutateAsync()
                   .then(() => {
                     setConfirmReset(false);
-                    toast.success("Demo data reset. The review queue is back to its seeded state.");
+                    toast.success("Data reset. The review queue has been cleared.");
                   })
                   .catch((error: unknown) => {
                     setConfirmReset(false);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Copy, Check, AlertTriangle } from "lucide-react";
-import { useThreadStatus, useThreadTimeline } from "@/hooks/use-trace";
+import { useThreadStatus, useThreadTimeline, useDataMode } from "@/hooks/use-trace";
 import { StatusBadge, ConfidenceBadge, DecisionStateBadge, EscalationBadge, SeverityBadge } from "@/components/status-badge";
 import { ConfidenceBar } from "@/components/confidence-bar";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatUsdFull, formatUsdCompactPrecise, formatPercent, formatDateTime } from "@/lib/format";
 import type { AuditStatusValue } from "@/api/types";
+import { secSnapshot } from "@/api/mock/fixtures";
 
 export function FilingDetailPage() {
   // The route is declared as "filings/:id".
   const { id: threadId = "" } = useParams();
   const { data: status, error, isLoading, refetch } = useThreadStatus(threadId || null);
   const { data: timeline } = useThreadTimeline(threadId || null);
+  const { mode } = useDataMode();
   const [tab, setTab] = useState("metrics");
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -91,7 +93,7 @@ export function FilingDetailPage() {
             </div>
             {status.accuracy_report ? <div className="text-right">Accuracy {formatPercent(status.accuracy_report.accuracy_pct, 1)}</div> : null}
           </div>
-          {status.demo_only ? <Badge variant="warning">Demo preset</Badge> : null}
+          {status.demo_only ? <Badge variant="warning">Preset</Badge> : null}
         </CardContent>
       </Card>
 
@@ -130,33 +132,112 @@ export function FilingDetailPage() {
                     ))}
                   </div>
                 ) : null}
-                {(status.metrics ?? []).map((m) => (
-                  <div key={m.metric_name} className="rounded-xl border">
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 p-3 text-left"
-                      onClick={() => setExpandedMetric(expandedMetric === m.metric_name ? null : m.metric_name)}
-                      aria-expanded={expandedMetric === m.metric_name}
-                    >
-                      <div>
-                        <div className="font-medium">{m.metric_name}</div>
-                        <div className="text-xs text-muted-foreground">{m.period}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold tabular-nums">{formatUsdFull(m.value_usd)}</div>
-                        <div className="text-xs text-muted-foreground tabular-nums">Compact {formatUsdCompactPrecise(m.value_usd)}</div>
-                      </div>
-                      <ConfidenceBadge confidence={m.confidence} label={m.confidence_label} />
-                      <DecisionStateBadge state={m.decision_state} />
-                    </button>
-                    {expandedMetric === m.metric_name ? (
-                      <div className="border-t p-3">
-                        <ConfidenceBar value={m.confidence} label={m.confidence_label} signals={m.confidence_signals} id={m.metric_name} />
-                        <div className="mt-2 font-mono text-xs break-words">{m.source_snippet}</div>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                        <th className="py-2 px-3 font-medium">Metric</th>
+                        <th className="py-2 px-3 font-medium text-right">Current</th>
+                        <th className="py-2 px-3 font-medium text-right">Prior year</th>
+                        <th className="py-2 px-3 font-medium text-right">YoY %</th>
+                        <th className="py-2 px-3 font-medium">Confidence</th>
+                        <th className="py-2 px-3 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(status.metrics ?? []).map((m) => {
+                        const prior = m.prior_year_value_usd;
+                        let yoy: number | null = null;
+                        if (prior && prior !== 0) {
+                          yoy = ((m.value_usd - prior) / Math.abs(prior)) * 100;
+                        }
+                        const expanded = expandedMetric === m.metric_name;
+                        return (
+                          <>
+                            <tr
+                              key={m.metric_name}
+                              className="border-b cursor-pointer hover:bg-muted/20"
+                              onClick={() => setExpandedMetric(expanded ? null : m.metric_name)}
+                              aria-expanded={expanded}
+                            >
+                              <td className="py-2.5 px-3">
+                                <div className="font-medium">{m.metric_name}</div>
+                                <div className="text-xs text-muted-foreground">{m.period}</div>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <div className="font-semibold tabular-nums">{formatUsdFull(m.value_usd)}</div>
+                                <div className="text-xs text-muted-foreground tabular-nums">{formatUsdCompactPrecise(m.value_usd)}</div>
+                              </td>
+                              <td className="py-2.5 px-3 text-right tabular-nums">
+                                {prior != null ? (
+                                  <>
+                                    <div>{formatUsdFull(prior)}</div>
+                                    <div className="text-xs text-muted-foreground">{formatUsdCompactPrecise(prior)}</div>
+                                  </>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right tabular-nums">{yoy == null ? "—" : `${yoy >= 0 ? "+" : ""}${yoy.toFixed(2)}%`}</td>
+                              <td className="py-2.5 px-3">
+                                <ConfidenceBadge confidence={m.confidence} label={m.confidence_label} />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <DecisionStateBadge state={m.decision_state} />
+                              </td>
+                            </tr>
+                            {expanded ? (
+                              <tr key={`${m.metric_name}-expanded`} className="border-b bg-muted/10">
+                                <td colSpan={6} className="p-3">
+                                  <div className="space-y-2">
+                                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source evidence</div>
+                                    {mode === "http" && m.source_header ? (
+                                      <>
+                                        <div className="rounded-lg border bg-background p-2">
+                                          <div className="text-xs text-muted-foreground">Header row</div>
+                                          <div className="mt-1 font-mono text-xs">{m.source_header || "—"}</div>
+                                        </div>
+                                        <div className="rounded-lg border bg-background p-2 ring-1 ring-info/40">
+                                          <div className="text-xs text-muted-foreground">Highlighted source row</div>
+                                          <div className="mt-1 font-mono text-xs break-words">{m.source_row || m.source_snippet || "—"}</div>
+                                        </div>
+                                        <div className="font-mono text-xs break-words text-muted-foreground">{m.source_snippet}</div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {(() => {
+                                          const snap = (secSnapshot as any)?.companies?.[status.ticker];
+                                          const sm = snap?.metrics?.[m.metric_name === 'Research and Development' ? 'R&D Expense' : m.metric_name];
+                                          const tag = sm?.xbrl_tag || 'N/A';
+                                          const accn = snap?.accession_number || status.cik;
+                                          const pstart = sm?.period_start;
+                                          const pend = sm?.period_end || status.period_end;
+                                          const furl = snap?.filing_index_url || status.filing_url;
+                                          const periodStr = pstart ? `${pstart} to ${pend}` : pend;
+                                          return (
+                                            <div className="rounded-lg border bg-background p-2">
+                                              <div className="font-mono text-xs">XBRL fact: us-gaap:{tag} | period {periodStr} | accession {accn}</div>
+                                              {furl ? (
+                                                <a className="mt-1 inline-block text-xs text-info hover:underline" href={furl} target="_blank" rel="noreferrer">
+                                                  Filing index ↗
+                                                </a>
+                                              ) : null}
+                                            </div>
+                                          );
+                                        })()}
+                                      </>
+                                    )}
+                                    <ConfidenceBar value={m.confidence} label={m.confidence_label} signals={m.confidence_signals} id={m.metric_name} />
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </TabsContent>
 

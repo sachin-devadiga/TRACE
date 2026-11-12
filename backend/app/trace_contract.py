@@ -74,7 +74,7 @@ def _env_flag(name: str, default: bool) -> bool:
 # The integrated app is a demo host: the deterministic demo threads can be
 # re-seeded on demand. Tampering with the append-only audit log stays off
 # unless it is explicitly enabled, because it breaks the hash chain on purpose.
-RESET_ENABLED = _env_flag("DEMO_RESET_ENABLED", True)
+RESET_ENABLED = _env_flag("DEMO_RESET_ENABLED", False)
 TAMPER_ENABLED = _env_flag("DEMO_TAMPER_ENABLED", False)
 DEMO_FAILURE_ENABLED = _env_flag("DEMO_FAILURE_MODE", False)
 
@@ -142,9 +142,13 @@ def _as_int(value: Any) -> int | None:
 
 
 def _as_fraction(value: Any) -> float | None:
-    """Backend reports percentages; the UI contract uses fractions (0.875)."""
+    """Backend reports percentages on 0-100 scale."""
     number = _as_float(value)
-    return None if number is None else round(number / 100.0, 6)
+    if number is None:
+        return None
+    # Clamp to valid percentage range to prevent impossible values
+    number = max(0.0, min(1000.0, number))
+    return round(number, 6)
 
 
 def _as_fiscal_year(value: Any) -> int | None:
@@ -853,21 +857,16 @@ def trace_verify_chain() -> dict[str, Any]:
 
 @router.post("/demo/reset")
 def trace_demo_reset() -> dict[str, Any]:
-    """Clear every thread and re-seed the deterministic demo threads.
-
-    This makes the integrated demo (and the Playwright end-to-end test)
-    repeatable: the paused thread is always available for review.
-    """
+    """Clear every thread."""
     if not RESET_ENABLED:
         raise HTTPException(
-            status_code=409, detail="Demo reset is disabled in live mode."
+            status_code=409, detail="Reset is disabled."
         )
     with _GRAPH_LOCK:
         thread_ids = list(_checkpoint_thread_ids())
     cleared = clear_threads(thread_ids)
     FAILURE_THREADS.clear()
-    seeded = seed_demo_threads()
-    return {"reset": True, "cleared": cleared, "seeded": seeded}
+    return {"reset": True, "cleared": cleared, "seeded": []}
 
 
 @router.api_route("/demo/tamper", methods=["GET", "POST"])

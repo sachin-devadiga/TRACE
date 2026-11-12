@@ -66,7 +66,7 @@ export function Sidebar() {
             )}
             data-testid="data-mode"
           >
-            {mode === "mock" ? "Demo data" : "Live"}
+            {mode === "mock" ? "SEC snapshot" : "Live"}
           </span>
         </div>
         <button

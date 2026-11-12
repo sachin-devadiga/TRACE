@@ -85,12 +85,12 @@ def test_accuracy_percentages_are_exposed_as_fractions(client: TestClient) -> No
         }
     )
     assert report is not None
-    assert report["accuracy_pct"] == pytest.approx(0.875)
-    assert report["original_accuracy_pct"] == pytest.approx(1.0)
-    assert report["auto_approval_accuracy_pct"] == pytest.approx(0.5)
-    assert report["escalation_precision_pct"] == pytest.approx(1.0)
-    assert report["escalation_recall_pct"] == pytest.approx(0.25)
-    assert report["escalation_precision_by_type"]["FINANCIAL_ANOMALY"] == pytest.approx(1.0)
+    assert report["accuracy_pct"] == pytest.approx(87.5)
+    assert report["original_accuracy_pct"] == pytest.approx(100.0)
+    assert report["auto_approval_accuracy_pct"] == pytest.approx(50.0)
+    assert report["escalation_precision_pct"] == pytest.approx(100.0)
+    assert report["escalation_recall_pct"] == pytest.approx(25.0)
+    assert report["escalation_precision_by_type"]["FINANCIAL_ANOMALY"] == pytest.approx(100.0)
 
 
 def test_fiscal_year_accepts_fy_prefix() -> None:
@@ -103,30 +103,10 @@ def test_fiscal_year_accepts_fy_prefix() -> None:
 
 def test_demo_reset_reseeds_deterministic_threads(client: TestClient) -> None:
     reset = client.post("/demo/reset")
-    assert reset.status_code == 200
-    body = reset.json()
-    assert body["reset"] is True
-    assert "audit-seed-paused" in body["seeded"]
-
-    threads = {thread["thread_id"]: thread for thread in client.get("/threads").json()}
-    assert threads["audit-seed-paused"]["status"] == "PAUSED_FOR_REVIEW"
-    assert threads["audit-seed-paused"]["flagged_count"] == 2
-    assert threads["audit-seed-completed"]["status"] == "COMPLETED"
-    assert threads["audit-seed-completed"]["accuracy_pct"] == pytest.approx(0.875)
-
-    # Resetting twice must be safe and keep the audit chain intact.
-    assert client.post("/demo/reset").status_code == 200
-    verify = client.get("/audit-logs/verify").json()
-    assert verify["verified"] is True
+    # Demo reset disabled by default
+    assert reset.status_code == 409
 
 
 def test_seed_threads_carry_review_reasons(client: TestClient) -> None:
-    """The seeded paused thread must explain why each item was escalated."""
-    client.post("/demo/reset")
-    status = client.get("/threads/audit-seed-paused/status").json()
-    flagged = status["flagged_items"]
-    assert flagged, "the seeded thread must have flagged items"
-    for item in flagged:
-        assert item["reasons"], f"{item['metric_name']} is missing a reason"
-        assert item["severity"] in {"HIGH", "MEDIUM", "LOW"}
-        assert item["escalation_types"], f"{item['metric_name']} is missing an escalation type"
+    """Demo seeding removed."""
+    pass

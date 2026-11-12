@@ -170,7 +170,7 @@ export class MockTraceApi {
     const thread = this.db.threads[threadId];
     if (!thread) return;
     const company = findCompanyByCik(thread.cik);
-    const flagged = flaggedForCompany(thread.cik);
+    const flagged = flaggedForCompany(company);
     const willPause = thread.demo_only || flagged.length > 0;
     const now = () => new Date().toISOString();
 

@@ -903,16 +903,17 @@ def _build_accuracy_report(
             }
         )
 
-    original_accuracy_pct = (
-        round(original_matches / original_comparable * 100.0, 2)
-        if original_comparable
-        else 0.0
-    )
-    accuracy_pct = (
-        round(final_matches / final_comparable * 100.0, 2)
-        if final_comparable
-        else 0.0
-    )
+    original_accuracy_pct = 0.0
+    if original_comparable > 0:
+        original_accuracy_pct = round(
+            (original_matches / original_comparable) * 100.0, 2
+        )
+    original_accuracy_pct = max(0.0, min(100.0, original_accuracy_pct))
+    
+    accuracy_pct = 0.0
+    if final_comparable > 0:
+        accuracy_pct = round((final_matches / final_comparable) * 100.0, 2)
+    accuracy_pct = max(0.0, min(100.0, accuracy_pct))
     final_details = [
         detail for detail in details if detail.get("audited_value") is not None
     ]
@@ -1016,19 +1017,23 @@ def _build_accuracy_report(
     for stats in escalation_by_type.values():
         if stats["escalated_count"]:
             stats["precision_pct"] = round(
-                stats["genuine_count"] / stats["escalated_count"] * 100.0, 2
+                (stats["genuine_count"] / stats["escalated_count"]) * 100.0, 2
             )
+            stats["precision_pct"] = max(0.0, min(100.0, stats["precision_pct"]))
 
-    escalation_precision_pct = (
-        round(genuine_escalations / len(escalated_names) * 100.0, 2)
-        if escalated_names
-        else None
-    )
-    escalation_recall_pct = (
-        round(len(set(escalated_names) & genuine_issue_names) / len(genuine_issue_names) * 100.0, 2)
-        if genuine_issue_names
-        else 100.0
-    )
+    escalation_precision_pct = None
+    if escalated_names:
+        escalation_precision_pct = round(
+            (genuine_escalations / len(escalated_names)) * 100.0, 2
+        )
+        escalation_precision_pct = max(0.0, min(100.0, escalation_precision_pct))
+    escalation_recall_pct = 100.0
+    if genuine_issue_names:
+        escalation_recall_pct = round(
+            (len(set(escalated_names) & genuine_issue_names) / len(genuine_issue_names)) * 100.0,
+            2,
+        )
+        escalation_recall_pct = max(0.0, min(100.0, escalation_recall_pct))
 
     auto_names = {
         _normalize_name(log["metric_name"])
@@ -1044,11 +1049,12 @@ def _build_accuracy_report(
     auto_matches = sum(
         1 for detail in auto_details if detail.get("original_match") is True
     )
-    auto_approval_accuracy_pct = (
-        round(auto_matches / len(auto_details) * 100.0, 2)
-        if auto_details
-        else None
-    )
+    auto_approval_accuracy_pct = None
+    if auto_details:
+        auto_approval_accuracy_pct = round(
+            (auto_matches / len(auto_details)) * 100.0, 2
+        )
+        auto_approval_accuracy_pct = max(0.0, min(100.0, auto_approval_accuracy_pct))
 
     return {
         "thread_id": state.get("thread_id"),
