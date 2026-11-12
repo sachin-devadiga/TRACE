@@ -162,6 +162,89 @@ append-only audit log is never deleted.
 | `VITE_API_MODE` | `frontend/.env` | `http` for the real backend, `mock` for the in-browser demo |
 | `VITE_API_BASE` | `frontend/.env` | Backend base URL |
 
+## Deploying to Render
+
+The repository contains a [Render blueprint](render.yaml) that creates both
+services:
+
+| Service | Type | What it serves |
+|---|---|---|
+| `trace-backend` | web (Python) | The FastAPI + LangGraph audit API |
+| `trace-frontend` | web (static) | The built Vite dashboard |
+
+### Step 1 — create the Blueprint
+
+1. Push this repository to GitHub (see below).
+2. In Render: **New → Blueprint** → select the repository → **Apply**.
+3. Render asks for the three secrets it cannot read from the repo:
+   - `GEMINI_API_KEY`
+   - `GROQ_API_KEY`
+   - `VITE_API_BASE` (leave it for now — step 3)
+
+### Step 2 — note the backend URL
+
+The backend is live within a couple of minutes at:
+
+```
+https://trace-backend.onrender.com
+```
+
+Check it: `https://trace-backend.onrender.com/health` must return
+`{"status":"ok","version":"2.0.0"}`.
+
+The free plan sleeps after 15 minutes of inactivity, so the first request can
+take ~30 seconds while the service wakes up. The dashboard says so explicitly
+instead of showing an empty page.
+
+### Step 3 — point the frontend at the backend
+
+1. Open the `trace-frontend` service → **Settings → Environment**.
+2. Set `VITE_API_BASE` to `https://trace-backend.onrender.com`.
+3. Set `CORS_ORIGINS` on `trace-backend` to include the frontend origin:
+   `http://localhost:5173,http://127.0.0.1:5173,https://trace-frontend.onrender.com`
+   (the blueprint already contains this value).
+4. Save on both services. Render rebuilds the frontend with the new API base.
+
+### Step 4 — verify
+
+Open `https://trace-frontend.onrender.com`. The header must show **DATA MODE:
+Live**. Deep links such as `/review` and `/filings/<thread_id>` work because the
+blueprint rewrites every path to `index.html`.
+
+### Durable data (optional)
+
+By default the audit log and the workflow checkpoints live in the service's
+ephemeral filesystem, so they are lost on the next deploy. To keep them:
+
+1. Create a **Disk** (1 GB is plenty) and attach it to `trace-backend` at
+   `/var/data`.
+2. Set `AUDITOR_DB_PATH=/var/data/auditor.db` and
+   `AUDITOR_CHECKPOINT_DB=/var/data/checkpoints.db` on the service.
+
+### Testing a production build locally
+
+```powershell
+cd "C:\Users\sachi\Videos\final TRACE\frontend"
+$env:VITE_API_MODE="http"; $env:VITE_API_BASE="http://127.0.0.1:8000"
+npm run build
+python scripts/serve-dist.py 4173 dist      # static server with SPA fallback
+npx playwright test e2e/production-build.spec.ts
+```
+
+That test drives the built `dist/` folder — exactly what Render serves — against
+the live backend, including deep links.
+
+## Push to GitHub
+
+```powershell
+cd "C:\Users\sachi\Videos\final TRACE"
+git remote add origin https://github.com/<you>/<repo>.git
+git push -u origin main
+```
+
+The repository already ignores `.env`, `node_modules`, `data/` and `*.db`, so the
+API keys stay out of git. Only `.env.example` files are tracked.
+
 ## Notes for production
 
 - The workflow is stateful and uses SQLite checkpoints plus an append-only audit log

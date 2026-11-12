@@ -12,6 +12,7 @@ FastAPI executes these ``def`` endpoints in its worker threadpool.
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import threading
 import uuid
@@ -102,6 +103,21 @@ async def lifespan(_: FastAPI):
         _GRAPH = None
 
 
+def _cors_origins() -> list[str]:
+    """Origins allowed to call the API.
+
+    Defaults cover the local Vite dev server. A hosted deployment sets
+    ``CORS_ORIGINS`` to the deployed frontend origin, for example
+    ``https://trace-frontend.onrender.com``.
+    """
+    raw = (
+        os.getenv("CORS_ORIGINS")
+        or "http://localhost:5173,http://127.0.0.1:5173"
+    )
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
 app = FastAPI(
     title="PS-01 Financial Filing Auditor",
     version="2.0.0",
@@ -115,7 +131,7 @@ app = FastAPI(
 # TRACE web client (Vite dev server). The Streamlit dashboard is unaffected.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins(),
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],

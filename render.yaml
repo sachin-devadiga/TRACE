@@ -1,0 +1,76 @@
+# Render blueprint for TRACE — the financial filing auditor.
+#
+# Deploy order (the frontend needs the backend URL at build time):
+#   1. Create the Blueprint from this repository.
+#   2. Render creates BOTH services. The backend gets a URL immediately.
+#   3. Copy the backend URL (https://trace-backend.onrender.com) into the
+#      trace-frontend service: Settings -> Environment -> VITE_API_BASE.
+#   4. Save. Render rebuilds the frontend with the correct API base.
+#
+# Secrets: GEMINI_API_KEY, GROQ_API_KEY and VITE_API_BASE are marked
+# "sync: false", so Render prompts for them instead of taking them from the
+# repository. Never commit real keys.
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend — FastAPI + LangGraph audit workflow
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: trace-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      # SEC fair access: identify the caller on every request.
+      - key: SEC_USER_AGENT
+        value: MineArenaAuditor team@bietdavangere.edu
+      # Structured extraction is a short table lookup; 0 keeps an audit near
+      # 10-15 seconds instead of ~25.
+      - key: GEMINI_THINKING_BUDGET
+        value: "0"
+      # Allowed browser origins. The deployed frontend origin is predictable
+      # from the service name, so it is listed here. Add a custom domain here
+      # too when you attach one.
+      - key: CORS_ORIGINS
+        value: http://localhost:5173,http://127.0.0.1:5173,https://trace-frontend.onrender.com
+      # Demo controls
+      - key: DEMO_RESET_ENABLED
+        value: "true"
+      - key: DEMO_TAMPER_ENABLED
+        value: "false"
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Vite + React dashboard, served as a static site
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: trace-frontend
+    runtime: static
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_MODE
+        value: http
+      # Set this to the backend URL after the first deploy:
+      # https://trace-backend.onrender.com
+      - key: VITE_API_BASE
+        sync: false
+    routes:
+      # Client-side routing: every path serves the SPA shell.
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -23,7 +23,7 @@ export default defineConfig({
   projects: [
     {
       name: "live",
-      testMatch: /(http-backend|ui-audit)\.spec\.ts/,
+      testMatch: /(http-backend|ui-audit|production-build)\.spec\.ts/,
       use: { baseURL: `http://127.0.0.1:${livePort}` },
     },
     {

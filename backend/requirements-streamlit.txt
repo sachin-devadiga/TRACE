@@ -1,0 +1,18 @@
+# Optional extras for the legacy Streamlit workbench.
+#
+# The web UI (frontend/) talks to the FastAPI contract and does not need any
+# of this. Install these only if you want to run the Streamlit dashboard:
+#
+#     pip install -r requirements.txt -r requirements-streamlit.txt
+#     streamlit run app/streamlit_app.py
+
+streamlit
+
+# Pinned because pandas 3.x's native tslib DLL is blocked by the development
+# machine's Application Control policy; 2.2.3 imports cleanly and satisfies
+# Streamlit.
+pandas==2.2.3
+
+# Pinned because pyarrow 26.x and 14.x native DLLs are blocked by the same
+# policy; 17.0.0 imports cleanly and powers st.dataframe.
+pyarrow==17.0.0
