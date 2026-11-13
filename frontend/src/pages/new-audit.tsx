@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Layers } from "lucide-react";
-import { useCompanies, useStartAudit, useThreadStatus } from "@/hooks/use-trace";
+import { Play, Layers, Search } from "lucide-react";
+import {
+  useCompanies,
+  useCompanySearch,
+  useFilings,
+  useStartAudit,
+  useThreadStatus,
+  useDataMode,
+} from "@/hooks/use-trace";
+import type { CompanyInfo } from "@/api/types";
+import { Input } from "@/components/ui/input";
 import { WorkflowStepper } from "@/components/workflow-stepper";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -16,9 +25,13 @@ import { toast } from "sonner";
 export function NewAuditPage() {
   const navigate = useNavigate();
   const { data: companies, isLoading } = useCompanies();
+  const { mode } = useDataMode();
   const startAudit = useStartAudit();
 
   const [selected, setSelected] = useState<string[]>(["0000320193"]);
+  const [manualCompany, setManualCompany] = useState<CompanyInfo | null>(null);
+  const [query, setQuery] = useState("");
+  const [accession, setAccession] = useState<string | undefined>(undefined);
   const [confidence, setConfidence] = useState(0.85);
   const [yoy, setYoY] = useState(0.3);
   const [demoOnly, setDemoOnly] = useState(false);
@@ -26,18 +39,38 @@ export function NewAuditPage() {
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const activeStatus = useThreadStatus(activeThreadId);
 
+  const searchResults = useCompanySearch(query);
+  const chosenCik = manualCompany?.cik ?? (selected.length === 1 ? selected[0] : undefined);
+  const filings = useFilings(chosenCik, "10-K");
+  const newestFiling = filings.data?.[0]?.accession_number;
+  const effectiveAccession = accession ?? newestFiling;
+
   const errorMessage = (error: unknown) =>
     error instanceof Error
       ? error.message
       : "The backend did not respond. Check that the API server is running on port 8000.";
 
-  const runSingle = async (cik: string) => {
+  const chooseCompany = (company: CompanyInfo) => {
+    setSelected([company.cik]);
+    setManualCompany(company);
+    // A different filing history means the previous accession is invalid.
+    setAccession(undefined);
+  };
+
+  const toggle = (cik: string) => {
+    setManualCompany((prev) => (prev?.cik === cik ? null : prev));
+    setSelected((prev) => (prev.includes(cik) ? prev.filter((c) => c !== cik) : [...prev, cik]));
+    setAccession(undefined);
+  };
+
+  const runSingle = async (cik: string, accessionNumber?: string) => {
     try {
       const result = await startAudit.mutateAsync({
         cik,
         confidence_threshold: confidence,
         yoy_threshold_pct: yoy,
         demo_only: demoOnly,
+        accession_number: accessionNumber,
       });
       setActiveThreadId(result.thread_id);
       toast.success(`Audit started for CIK ${cik}.`);
@@ -85,11 +118,8 @@ export function NewAuditPage() {
     }
   };
 
-  const toggle = (cik: string) => {
-    setSelected((prev) => (prev.includes(cik) ? prev.filter((c) => c !== cik) : [...prev, cik]));
-  };
-
   const threadStatus = activeStatus.data;
+  const canRunSingle = Boolean(chosenCik) && !startAudit.isPending;
 
   return (
     <div className="space-y-6">
@@ -99,8 +129,54 @@ export function NewAuditPage() {
             <CardTitle>1 · Choose companies</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? <div className="h-32 animate-pulse rounded-lg bg-muted" /> : null}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search any company on EDGAR by name or ticker…"
+                className="pl-9"
+                aria-label="Search companies"
+                data-testid="company-search-input"
+              />
+            </div>
+            {mode === "mock" ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Snapshot mode only knows the five preset companies. Set{" "}
+                <code className="rounded bg-muted px-1">VITE_API_MODE=http</code> to search live EDGAR and audit any filer.
+              </p>
+            ) : null}
+            {searchResults.data && searchResults.data.length > 0 ? (
+              <div className="mt-3 space-y-2" data-testid="company-search-results">
+                {searchResults.data.map((company) => {
+                  const active = chosenCik === company.cik;
+                  return (
+                    <button
+                      key={company.cik}
+                      type="button"
+                      onClick={() => chooseCompany(company)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        active ? "border-primary bg-accent" : "bg-card hover:bg-accent/50"
+                      )}
+                      data-testid={`search-result-${company.ticker}`}
+                    >
+                      <span>
+                        <span className="block font-medium">{company.name}</span>
+                        <span className="block text-xs text-muted-foreground">CIK {company.cik}</span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {company.configured ? <Badge variant="secondary">Preset</Badge> : null}
+                        <span className="text-sm font-medium text-muted-foreground tabular-nums">{company.ticker}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {isLoading ? <div className="mt-4 h-32 animate-pulse rounded-lg bg-muted" /> : null}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {(companies ?? []).map((c) => (
                 <button
                   key={c.cik}
@@ -120,8 +196,69 @@ export function NewAuditPage() {
                 </button>
               ))}
             </div>
+
+            {chosenCik ? (
+              <div className="mt-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Filing</div>
+                  {filings.isLoading ? <span className="text-xs text-muted-foreground">Loading filings…</span> : null}
+                </div>
+                {!filings.isLoading && (filings.data ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground" data-testid="filings-empty">
+                    No 10-K filings found for CIK {chosenCik}.
+                  </p>
+                ) : null}
+                <div className="space-y-2" data-testid="filing-options">
+                  {(filings.data ?? []).map((filing) => {
+                    const active = effectiveAccession === filing.accession_number;
+                    return (
+                      <div key={filing.accession_number} className="flex items-center gap-2">
+                        <label
+                          className={cn(
+                            "flex flex-1 cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all",
+                            active ? "border-primary bg-accent" : "hover:bg-accent/50"
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="filing"
+                            className="mt-1"
+                            checked={active}
+                            onChange={() => setAccession(filing.accession_number)}
+                          />
+                          <span>
+                            <span className="block text-sm font-medium">
+                              10-K · filed {filing.filing_date || "unknown"}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              Accession {filing.accession_number}
+                              {filing.report_date ? ` · period ${filing.report_date}` : ""}
+                            </span>
+                          </span>
+                        </label>
+                        {filing.primary_document ? (
+                          <a
+                            href={filing.primary_document}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-medium text-primary hover:underline"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            Open
+                          </a>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Live mode fetches this filing from SEC EDGAR and scores it fresh; the newest 10-K is used when no filing is selected.
+                </p>
+              </div>
+            ) : null}
+
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button onClick={() => selected.length === 1 && runSingle(selected[0])} disabled={selected.length !== 1 || startAudit.isPending}>
+              <Button onClick={() => chosenCik && runSingle(chosenCik, effectiveAccession)} disabled={!canRunSingle}>
                 <Play className="h-4 w-4" aria-hidden="true" />
                 Run audit
               </Button>
@@ -129,7 +266,7 @@ export function NewAuditPage() {
                 <Layers className="h-4 w-4" aria-hidden="true" />
                 Run all companies
               </Button>
-              {selected.length !== 1 ? (
+              {!chosenCik ? (
                 <span className="text-xs text-muted-foreground">
                   {selected.length === 0
                     ? "No company selected — “Run all companies” will audit every supported company."

@@ -38,6 +38,8 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "AUDITABLE_FORMS",
+    "COMPANY_DIRECTORY_URL",
     "DEFAULT_SEC_USER_AGENT",
     "SEC_MAX_ATTEMPTS",
     "SEC_REQUEST_DELAY",
@@ -45,9 +47,12 @@ __all__ = [
     "SEC_USER_AGENT",
     "TARGET_COMPANIES",
     "cache_only",
+    "company_filings",
     "fetch_latest_10k_tables",
     "fetch_xbrl_ground_truth",
     "normalize_cik",
+    "resolve_company",
+    "search_companies",
     "sec_cache_dir",
 ]
 
@@ -322,6 +327,72 @@ def _submissions(cik: str) -> dict[str, Any]:
     return _get(f"https://data.sec.gov/submissions/CIK{cik}.json").json()
 
 
+COMPANY_DIRECTORY_URL = "https://www.sec.gov/files/company_tickers.json"
+
+# Forms whose primary document carries the financial statements the auditor reads.
+AUDITABLE_FORMS: tuple[str, ...] = ("10-K", "10-Q", "20-F", "40-F")
+
+
+@lru_cache(maxsize=1)
+def _company_directory() -> list[dict[str, str]]:
+    """The SEC's own ticker/CIK directory (the list EDGAR's search box uses)."""
+    payload = _get(COMPANY_DIRECTORY_URL, cache_tag="companies").json()
+    companies: list[dict[str, str]] = []
+    for entry in payload.values() if isinstance(payload, dict) else ():
+        try:
+            companies.append(
+                {
+                    "name": str(entry["title"]).strip(),
+                    "ticker": str(entry["ticker"]).strip().upper(),
+                    "cik": normalize_cik(entry["cik_str"]),
+                }
+            )
+        except (AttributeError, KeyError, TypeError, ValueError):
+            continue
+    return companies
+
+
+def search_companies(query: str, *, limit: int = 8) -> list[dict[str, str]]:
+    """Type-ahead over every company EDGAR knows, not only the five configured."""
+    q = (query or "").strip().upper()
+    if not q:
+        return []
+    scored: list[tuple[int, int, dict[str, str]]] = []
+    for company in _company_directory():
+        ticker, name = company["ticker"], company["name"].upper()
+        if ticker == q:
+            rank = 0
+        elif ticker.startswith(q):
+            rank = 1
+        elif name.startswith(q):
+            rank = 2
+        elif q in name:
+            rank = 3
+        else:
+            continue
+        scored.append((rank, len(ticker), company))
+    scored.sort(key=lambda row: (row[0], row[1], row[2]["ticker"]))
+    return [company for _, _, company in scored[: max(1, limit)]]
+
+
+def resolve_company(value: str) -> dict[str, str] | None:
+    """A ticker or a CIK for any company EDGAR lists."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    upper = raw.upper()
+    digits = re.sub(r"\D", "", raw)
+    for company in _company_directory():
+        if company["ticker"] == upper:
+            return company
+    if digits and len(digits) <= 10:
+        wanted = digits.zfill(10)
+        for company in _company_directory():
+            if company["cik"] == wanted:
+                return company
+    return None
+
+
 @lru_cache(maxsize=8)
 def _company_facts(cik: str) -> dict[str, Any]:
     return _get(
@@ -354,6 +425,75 @@ def _latest_10k_filing(submissions: dict[str, Any]) -> dict[str, Any]:
         candidates,
         key=lambda item: (item["filing_date"], item["accession_number"]),
     )
+
+
+def _filing_rows(submissions: dict[str, Any], cik: str) -> list[dict[str, Any]]:
+    """Recent columnar filings plus the older files the submissions API links to."""
+    filings = submissions.get("filings", {})
+    blocks = [filings.get("recent", {})]
+    for extra in filings.get("files", []) or []:
+        name = str(extra.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            blocks.append(
+                _get(
+                    f"https://data.sec.gov/submissions/{name}", cache_tag=cik
+                ).json()
+            )
+        except Exception:  # noqa: BLE001 - one missing old file must not hide the rest
+            continue
+    rows: list[dict[str, Any]] = []
+    for block in blocks:
+        forms = block.get("form", [])
+        for index in range(len(forms)):
+            rows.append(
+                {
+                    "form": str(forms[index]).strip().upper(),
+                    "accession_number": block["accessionNumber"][index],
+                    "filing_date": block["filingDate"][index],
+                    "report_date": block["reportDate"][index],
+                    "primary_document": block["primaryDocument"][index],
+                }
+            )
+    return rows
+
+
+def _filing_by_accession(
+    submissions: dict[str, Any], cik: str, accession: str
+) -> dict[str, Any]:
+    wanted = str(accession or "").strip().replace("-", "")
+    for row in _filing_rows(submissions, cik):
+        if str(row["accession_number"]).replace("-", "") == wanted:
+            return row
+    raise RuntimeError(f"No SEC filing {accession!r} found for this company.")
+
+
+def company_filings(
+    cik: str, *, form: str | None = None, limit: int = 25, auditable_only: bool = False
+) -> list[dict[str, Any]]:
+    """Every filing for a CIK, newest first, with the fields the dashboard needs."""
+    cik = normalize_cik(cik)
+    wanted = (form or "").strip().upper()
+    rows: list[dict[str, Any]] = []
+    for row in _filing_rows(_submissions(cik), cik):
+        base_form = row["form"].split("/")[0]
+        if wanted and row["form"] != wanted and row["form"] != f"{wanted}/A":
+            continue
+        auditable = base_form in AUDITABLE_FORMS
+        if auditable_only and not auditable:
+            continue
+        report = row.get("report_date") or row.get("filing_date") or ""
+        rows.append(
+            {
+                **row,
+                "cik": cik,
+                "auditable": auditable,
+                "fiscal_year": int(str(report)[:4]) if str(report)[:4].isdigit() else None,
+            }
+        )
+    rows.sort(key=lambda item: (item["filing_date"], item["accession_number"]), reverse=True)
+    return rows[: max(1, limit)]
 
 
 def _filing_document_url(cik: str, accession: str, primary_document: str) -> str:
@@ -779,11 +919,15 @@ def _extract_financial_tables(soup: BeautifulSoup) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def fetch_latest_10k_tables(cik: str) -> dict[str, Any]:
-    """Fetch the latest 10-K and return compact financial-statement tables."""
+def fetch_latest_10k_tables(cik: str, accession: str | None = None) -> dict[str, Any]:
+    """Fetch a 10-K (latest, or a specific EDGAR accession) and return its statement tables."""
     cik = normalize_cik(cik)
     submissions = _submissions(cik)
-    filing = _latest_10k_filing(submissions)
+    filing = (
+        _filing_by_accession(submissions, cik, accession)
+        if accession
+        else _latest_10k_filing(submissions)
+    )
 
     filing_url = _filing_document_url(
         cik,

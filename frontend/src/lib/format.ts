@@ -40,6 +40,19 @@ export function formatRatio(value: number | null | undefined, digits = 2): strin
   return value.toFixed(digits);
 }
 
+/**
+ * Format a 0-1 confidence fraction as a percentage. Keeps one decimal of
+ * precision so a score of 0.995 renders as "99.5%" instead of rounding up to
+ * an indistinguishable "100%".
+ */
+export function formatConfidence(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  const pct = Math.max(0, Math.min(1, value)) * 100;
+  const rounded = Math.round(pct * 10) / 10;
+  const text = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+  return `${text}%`;
+}
+
 export function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   return new Intl.NumberFormat("en-US").format(Math.round(value));

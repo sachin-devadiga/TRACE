@@ -24,6 +24,35 @@ export function useCompanies() {
   });
 }
 
+export function useCompanySearch(query: string) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: ["companies", "search", trimmed],
+    queryFn: () => api.searchCompanies(trimmed),
+    enabled: trimmed.length >= 2,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function useFilings(cik: string | null | undefined, form?: string) {
+  return useQuery({
+    queryKey: ["filings", cik, form ?? ""],
+    queryFn: () => api.listFilings(cik as string, form),
+    enabled: Boolean(cik),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function useFilingForms() {
+  return useQuery({
+    queryKey: ["filings", "forms"],
+    queryFn: () => api.listFilingForms(),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
+
 export function useThreads() {
   return useQuery({
     queryKey: ["threads"],

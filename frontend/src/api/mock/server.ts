@@ -5,6 +5,7 @@
   AuditLogRow,
   AuditStatus,
   CompanyInfo,
+  FilingCandidate,
   HealthResponse,
   ResumePayload,
   StartAuditRequest,
@@ -93,6 +94,40 @@ export class MockTraceApi {
   async listCompanies(): Promise<CompanyInfo[]> {
     await this.delay(250, 400);
     return FIXTURES.companies.map((c) => ({ name: c.name, ticker: c.ticker, cik: c.cik, industry: c.industry }));
+  }
+
+  async searchCompanies(query: string): Promise<CompanyInfo[]> {
+    await this.delay(200, 350);
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    // Mock mode only knows the five preset companies; the live backend searches
+    // the full EDGAR company directory.
+    return FIXTURES.companies
+      .filter((c) => c.name.toLowerCase().includes(q) || c.ticker.toLowerCase().includes(q))
+      .map((c) => ({ name: c.name, ticker: c.ticker, cik: c.cik, industry: c.industry, configured: true }));
+  }
+
+  async listFilings(cik: string, form?: string): Promise<FilingCandidate[]> {
+    await this.delay(200, 350);
+    const company = FIXTURES.companies.find((c) => c.cik === cik);
+    if (!company) return [];
+    const filings: FilingCandidate[] = [
+      {
+        cik: company.cik,
+        accession_number: company.accession_number ?? "",
+        form: "10-K",
+        filing_date: company.filed_date ?? "",
+        report_date: company.period_end ?? null,
+        primary_document: company.filing_index_url ?? "",
+        auditable: true,
+        fiscal_year: company.fiscal_year,
+      },
+    ];
+    return form ? filings.filter((f) => f.form === form) : filings;
+  }
+
+  async listFilingForms(): Promise<string[]> {
+    return ["10-K", "10-Q", "20-F", "40-F"];
   }
 
   async startAudit(request: StartAuditRequest): Promise<AuditStatus> {

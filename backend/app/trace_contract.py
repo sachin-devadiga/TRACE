@@ -42,7 +42,13 @@ from pydantic import BaseModel, Field
 
 from app.store import backend_label, clear_threads, get_audit_logs, insert_audit_log, verify_audit_chain
 from app.demo_seed import clear_threads, seed_demo_threads
-from app.edgar_client import TARGET_COMPANIES
+from app.edgar_client import (
+    AUDITABLE_FORMS,
+    TARGET_COMPANIES,
+    company_filings,
+    resolve_company,
+    search_companies,
+)
 from app.escalation import ESCALATION_TYPE_LABELS, types_for_item
 from app.main import (
     HumanDecision as BackendHumanDecision,
@@ -203,6 +209,14 @@ def _reason_sentences(item: dict[str, Any]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _metric_confidence_value(metric: dict[str, Any]) -> float:
+    """Prefer the deterministic score; fall back to the LLM reading."""
+    score = _as_float(metric.get("confidence_score"))
+    if score is None:
+        score = _as_float(metric.get("confidence"))
+    return score if score is not None else 0.0
+
+
 def _metric_view(
     metric: dict[str, Any],
     *,
@@ -219,11 +233,7 @@ def _metric_view(
         "unit": str(metric.get("unit") or "USD"),
         "period": str(metric.get("period") or ""),
         "prior_year_value_usd": _as_float(metric.get("prior_year_value_usd")),
-        "confidence": (
-            _as_float(metric.get("confidence_score"))
-            or _as_float(metric.get("confidence"))
-            or 0.0
-        ),
+        "confidence": _metric_confidence_value(metric),
         "confidence_label": str(metric.get("confidence_label") or "LOW"),
         "confidence_signals": _confidence_signals(metric.get("confidence_signals")),
         "source_snippet": str(metric.get("source_snippet") or ""),
@@ -673,6 +683,61 @@ def trace_companies() -> list[dict[str, Any]]:
     return companies
 
 
+@router.get("/companies/search")
+def trace_company_search(q: str = "", limit: int = 8) -> list[dict[str, Any]]:
+    """Any company on EDGAR, ranked. Powers the dashboard's search box."""
+    try:
+        found = search_companies(q, limit=max(1, min(limit, 25)))
+    except Exception as error:  # noqa: BLE001 - sec.gov down is a 503, never a 500
+        raise HTTPException(
+            status_code=503, detail=f"SEC company directory unavailable: {error}"
+        ) from error
+    configured = {str(profile.get("cik") or "").zfill(10) for profile in TARGET_COMPANIES.values()}
+    return [
+        {
+            "name": company["name"],
+            "ticker": company["ticker"],
+            "cik": company["cik"],
+            "industry": INDUSTRIES.get(company["cik"], "Public Equity"),
+            "configured": company["cik"] in configured,
+        }
+        for company in found
+    ]
+
+
+@router.get("/filings")
+def trace_filings(
+    cik: str = "",
+    form: str | None = None,
+    limit: int = 25,
+    auditable_only: bool = False,
+) -> list[dict[str, Any]]:
+    """A company's EDGAR filing history (submissions API), newest first."""
+    raw = (cik or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="send a ticker or a CIK")
+    company = resolve_company(raw)
+    target = company["cik"] if company else (raw if raw.isdigit() else "")
+    if not target:
+        raise HTTPException(status_code=404, detail=f"unknown company {raw!r}")
+    try:
+        return company_filings(
+            target,
+            form=form,
+            limit=max(1, min(limit, 100)),
+            auditable_only=auditable_only,
+        )
+    except Exception as error:  # noqa: BLE001
+        raise HTTPException(
+            status_code=503, detail=f"SEC submissions API unavailable: {error}"
+        ) from error
+
+
+@router.get("/filings/forms")
+def trace_filing_forms() -> list[str]:
+    return list(AUDITABLE_FORMS)
+
+
 @router.post("/audits")
 def trace_start_audit(payload: BackendStartAuditRequest) -> dict[str, Any]:
     """Start an audit and run it until completion or the review interrupt."""
@@ -685,6 +750,9 @@ def trace_start_audit(payload: BackendStartAuditRequest) -> dict[str, Any]:
         cik=str(payload.cik or ""),
         confidence_threshold=float(payload.confidence_threshold or 0.85),
         yoy_threshold_pct=yoy,
+        accession_number=(str(payload.accession_number).strip() or None)
+        if payload.accession_number
+        else None,
         demo_only=bool(payload.demo_only),
     )
     if DEMO_FAILURE_ENABLED:

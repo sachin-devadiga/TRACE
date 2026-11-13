@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { formatConfidence } from "@/lib/format";
 import type { ConfidenceSignals } from "@/api/types";
 
 interface ConfidenceBarProps {
@@ -27,7 +28,7 @@ export function ConfidenceBar({ value, label, signals, id }: ConfidenceBarProps)
     <div className="w-full" data-testid={`confidence-bar-${id ?? "default"}`}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">Confidence</span>
-        <span className="text-xs font-semibold text-foreground">{label === "HIGH" ? "High" : "Low"} · {(value * 100).toFixed(0)}%</span>
+        <span className="text-xs font-semibold text-foreground">{label === "HIGH" ? "High" : "Low"} · {formatConfidence(value)}</span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
         <div className={cn("h-full rounded-full transition-all", tone)} style={{ width: `${pct}%` }} />
@@ -37,12 +38,12 @@ export function ConfidenceBar({ value, label, signals, id }: ConfidenceBarProps)
           {signalKeys.map((key) => {
             const raw = (signals as Record<string, number | null> | undefined)?.[key] ?? null;
             const numeric = typeof raw === "number" ? raw : null;
-            const signalPct = numeric === null ? 0 : numeric * 100;
+            const text = numeric === null ? "—" : formatConfidence(numeric);
             return (
-              <div key={key} className="flex items-center gap-1.5" title={`${key.replace(/_/g, " ")}: ${numeric === null ? "n/a" : `${signalPct.toFixed(0)}%`}`}>
+              <div key={key} className="flex items-center gap-1.5" title={`${key.replace(/_/g, " ")}: ${text}`}>
                 <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden="true" />
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{key.replace(/_/g, " ")}</span>
-                <span className="text-[10px] font-medium text-foreground">{numeric === null ? "—" : `${signalPct.toFixed(0)}%`}</span>
+                <span className="text-[10px] font-medium text-foreground">{text}</span>
               </div>
             );
           })}

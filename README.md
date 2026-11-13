@@ -1,10 +1,12 @@
 # TRACE — Financial Filing Auditor
 
+> **Automate the routine. Escalate the uncertain. Keep every decision accountable.**
+
 TRACE audits SEC 10-K filings end to end: it fetches the filing, extracts the eight
-core financial metrics with two independent readers, scores its own confidence,
-runs deterministic validation, escalates anything doubtful to a human reviewer, and
-finally compares every figure against the SEC's own XBRL facts. Every decision is
-written to an append-only, hash-chained audit log.
+core financial metrics with two independent readers, scores its own confidence, runs
+deterministic validation, escalates anything doubtful to a human reviewer, and finally
+compares every figure against the SEC's own XBRL facts. Every decision is written to an
+append-only, hash-chained audit log.
 
 This repository contains the complete product:
 
@@ -22,58 +24,158 @@ final TRACE/
 │   │   ├── demo_seed.py     # Deterministic demo threads
 │   │   └── ...              # edgar_client, evidence, escalation, units
 │   ├── scripts/seed_demo.py # Seeds the demo threads + audit rows
-│   ├── tests/               # 13 backend tests (contract + regression)
+│   ├── tests/               # Backend test suite (contract, regression, gates)
 │   ├── requirements.txt
 │   └── .env.example
 ├── frontend/                # Vite + React + TypeScript dashboard
 │   ├── src/
 │   │   ├── api/             # TraceApi contract, HTTP client, in-browser mock
 │   │   ├── pages/           # overview, new-audit, review-queue, filings,
-│   │   │                    # filing-detail, accuracy, audit-log, settings
+│   │   │   # filing-detail, accuracy, audit-log, settings
 │   │   └── components/      # badges, charts, guided demo, layout
 │   ├── e2e/                 # Playwright suites (live backend + mock mode)
 │   └── .env.example
-└── README.md
+├── scripts/                 # preflight, SEC cache warmer, SEC fixtures fetcher
+├── render.yaml              # Render blueprint (backend + frontend services)
+├── GATES.md                 # Demo gates & judge checklist
+├── README.md                # ← you are here
+├── vision.md                # ← product north star
+└── workflow.md              # ← runtime audit flow
 ```
+
+## Why TRACE exists ([vision.md](vision.md))
+
+> **Automate the routine. Escalate the uncertain. Keep every decision accountable.**
+
+Public companies file 10-Ks constantly; auditors and investors read them, or wish they
+did. TRACE exists so that the *routine* reading — fetch, extract eight core metrics,
+validate, score confidence — is done by a machine that can show its work, while any
+*doubtful* number stops the pipeline and waits for a human. The long-term goal is a
+verifiable financial evidence trail per filing, where every decision is defensible and
+every figure can be checked against the SEC's own XBRL facts.
+
+## Tech stack — what a developer needs to know
+
+### Architecture at a glance
+
+```
+                 ┌────────────────────────────┐
+                 │        SEC EDGAR            │
+                 │  (submissions + company    │
+                 │   directory + XBRL facts)  │
+                 └─────────────┬──────────────┘
+                               │ HTTP (cached on disk)
+                 ┌─────────────▼──────────────┐
+                 │   FastAPI backend           │
+                 │   (app.api:app)             │
+                 │   ├─ /threads/*  (UI)      │
+                 │   ├─ /audit-logs*           │
+                 │   ├─ /demo/*                │
+                 │   └─ legacy /audit/* (off) │
+                 │   LangGraph state machine  │
+                 │   SQLite / MongoDB store   │
+                 └─────────────┬──────────────┘
+                               │ TraceApi over HTTP
+                 ┌─────────────▼──────────────┐
+                 │   React + Vite frontend     │
+                 │   (TraceApi interface,      │
+                 │    mock impl in-browser)   │
+                 └────────────────────────────┘
+```
+
+- The frontend **never** talks to the backend implementation details. It goes through
+  the `TraceApi` interface (`frontend/src/api/contract.ts`, types in `types.ts`) with two
+  implementations: `HttpTraceApi` (real backend) and `MockTraceApi` (in-browser demo
+  server). Switching modes is a one-line env var (`VITE_API_MODE`).
+
+### Backend (`backend/`)
+
+| Concern | Technology / module |
+|---|---|
+| Web framework | **FastAPI** (`fastapi==0.162.5`) + **Uvicorn** (`uvicorn[standard]`) |
+| Workflow engine | **LangGraph** (`langgraph==1.2.20`) with `StateGraph` of five nodes; checkpointing via `langgraph-checkpoint-sqlite` (`SqliteSaver`) or `langgraph-checkpoint-mongodb` (`MongoDBSaver`) |
+| LLM layer | **LangChain** (`langchain-core==1.8.0`, `langchain-openai` for **Groq**, `langchain-google-genai` for **Gemini**); primary/fallback run concurrently, agreement compared after USD normalization |
+| Schemas | **Pydantic v2** (`pydantic==2.13.4`) for API models and metrics/checks |
+| Storage | **SQLite** (`backend/data/auditor.db` audit log + `backend/data/checkpoints.db` checkpoints, WAL, append-only triggers, SHA-256 hash chain) — or **MongoDB** when `MONGO_URI` is set |
+| SEC client | `requests` + `beautifulsoup4`/`lxml`; on-disk cache in `backend/data/sec_cache`; User-Agent + rate-limit handling |
+| XBRL | SEC company facts via EDGAR; USD normalization (`app/units.py`) |
+| Confidence | `app/confidence.py` — weighted signals (snippet grounding, concept, unit, period, column, cross-statement, prior-year sanity, extractor agreement, LLM) with hard caps; threshold via `CONFIDENCE_HIGH_THRESHOLD` |
+| Validation | `app/validator.py` — pure deterministic checks (snippet grounding, extractor agreement, column/period, cross-statement, accounting equation, YoY, segments) |
+| Escalation | `app/escalation.py` — `EXTRACTION_RISK` vs `FINANCIAL_ANOMALY` typing |
+
+### Frontend (`frontend/`)
+
+| Concern | Technology |
+|---|---|
+| UI framework | **React 18** + **TypeScript** (`typescript==5.5.4`) |
+| Build tool | **Vite** (`vite==5.4.11`); `npm run build` = `tsc --noEmit` + `vite build` |
+| Routing | **React Router** v6 |
+| Server state | **TanStack Query** v5 (poll running threads every 2 s until terminal) |
+| Styling | **Tailwind CSS** + **Radix UI** primitives (shadcn-style in `src/components/ui/`) |
+| Charts | **Recharts** |
+| Icons / feedback | `lucide-react`, `sonner` |
+| Tests (e2e) | **Playwright** (`@playwright/test`) — projects `live` (real backend) and `mock` (in-browser demo), plus `production-build` |
+
+### Tooling & quality
+
+- Backend tests: **pytest** (+ `mongomock` for the MongoDB paths; no server needed in CI).
+- Formatting/lint: ESLint, Prettier (frontend); standard Python tooling via pytest/ruff-less setup.
+- CI: **GitHub Actions** (`.github/workflows/ci.yml`) — backend pytest on Python 3.11;
+  frontend `npm ci` → `npm run build` → boot backend → Playwright `--project=live`.
+
+### Infrastructure / deployment
+
+- **Render** blueprint ([render.yaml](render.yaml)): `trace-backend` (Python 3.11 web,
+  `uvicorn app.api:app`, health check `GET /health`) and `trace-frontend` (static,
+  build `npm ci && npm run build`, publish `./dist`, SPA rewrite `/* → /index.html`).
+- Secrets via Render (never in git): `GEMINI_API_KEY`, `GROQ_API_KEY`, `VITE_API_BASE`.
+- Optional durable state: attach a Render disk and set `AUDITOR_DB_PATH` /
+  `AUDITOR_CHECKPOINT_DB` (defaults: `backend/data/auditor.db`, `backend/data/checkpoints.db`).
 
 ## Quick start
 
-```powershell
-# 1. Backend — http://127.0.0.1:8000
-cd "C:\Users\sachi\Videos\final TRACE\backend"
+```bash
+# Backend — http://127.0.0.1:8000
+cd backend
 pip install -r requirements.txt
-copy .env.example .env          # then add GEMINI_API_KEY and GROQ_API_KEY
+cp .env.example .env          # add GEMINI_API_KEY and GROQ_API_KEY
 python -m uvicorn app.api:app --reload
 
-# 2. Frontend — http://127.0.0.1:5173
-cd "C:\Users\sachi\Videos\final TRACE\frontend"
+# Frontend — http://127.0.0.1:5173
+cd frontend
 npm install
-copy .env.example .env          # VITE_API_MODE=http, VITE_API_BASE=http://127.0.0.1:8000
+cp .env.example .env          # VITE_API_MODE=http, VITE_API_BASE=http://127.0.0.1:8000
 npm run dev
 ```
 
-Open <http://127.0.0.1:5173>. The header shows **DATA MODE: Live**, which means the
-dashboard is talking to the real backend rather than the in-browser demo server.
+Open <http://127.0.0.1:5173>. The header shows **DATA MODE: Live** when the backend is up,
+**Demo data** in mock mode.
 
-## What the reviewer sees
+## The nine workflow steps
 
-Every escalated metric carries a plain-language reason, the rules that fired, and a
-badge that explains itself:
+See [workflow.md](workflow.md) for the exact route:
 
-- **Extraction risk** — the number itself may be wrong (row not grounded in the
-  filing, wrong period column, or the two readers disagreed).
-- **Financial anomaly** — the number is plausible but moves unusually versus the
-  prior year.
+```
+Filing retrieval → Extraction → Confidence scoring → Validation
+   → Automated decision → Human review → Decision and resume
+   → XBRL verification → Audit history
+```
 
-The review queue states exactly how many flagged items still need a decision, and
-Submit stays disabled until every one of them has one — so nothing is ever silently
-approved.
+1. **Fetch** the latest 10-K from SEC EDGAR (cached, rate-limited, `SEC_USER_AGENT`).
+2. **Extract** the eight metrics with Gemini and Groq **in parallel**; compare to produce
+   an extractor-agreement signal.
+3. **Score** confidence from fixed deterministic signals (snippet grounding, concept
+   match, unit/period consistency, prior-year sanity, extractor agreement).
+4. **Validate** with deterministic rules: snippet grounding, column/period match,
+   accounting equation, cross-statement consistency, segment tables and YoY.
+5. **Route**: clean filings are auto-approved, anything flagged pauses for a human.
+6. **Verify** against the SEC's own XBRL facts and write the decision to the
+   append-only audit log.
 
-## Contract
+## API contract
 
-The UI speaks to a single `TraceApi` interface over HTTP
-(`frontend/src/api/contract.ts`). The backend exposes that contract through the
-additive router in `backend/app/trace_contract.py`:
+The UI speaks to a single `TraceApi` interface over HTTP; the backend exposes it through
+the additive router in `backend/app/trace_contract.py`:
 
 | UI method | Backend route |
 |---|---|
@@ -90,221 +192,68 @@ additive router in `backend/app/trace_contract.py`:
 | `tamperWithLastRow()` | `GET /demo/tamper` |
 | `setFailureMode()` | `POST /demo/failure-mode` |
 
-Two conventions matter:
-
-- The backend reports percentages (`87.5`); the UI expects fractions (`0.875`). The
-  adapter converts every `*_pct` field, so the dashboard shows `87.5%`.
-- `fiscal_year` accepts `FY2026`, `2026` or `2026-09-26` and always renders `2026`.
-
-## How an audit runs
-
-```
-Filing retrieval → Extraction → Confidence scoring → Validation
-   → Automated decision → Human review → Decision and resume
-   → XBRL verification → Audit history
-```
-
-1. **Fetch** the latest 10-K from SEC EDGAR (cached per process, `SEC_USER_AGENT`
-   on every request, rate limited).
-2. **Extract** the eight metrics with Gemini and Groq **in parallel**; the values
-   are compared to produce an extractor-agreement signal.
-3. **Score** confidence from fixed deterministic signals (snippet grounding, concept
-   match, unit and period consistency, prior-year sanity, extractor agreement).
-4. **Validate** with deterministic rules: snippet grounding, column/period match,
-   accounting equation, cross-statement consistency, segment tables and YoY.
-5. **Route**: clean filings are auto-approved, anything flagged pauses for a human.
-6. **Verify** against the SEC's own XBRL facts and write the decision to the
-   append-only audit log.
+Conventions: backend reports percentages, UI expects fractions (adapter converts);
+`fiscal_year` accepts `FY2026`, `2026` or `2026-09-26`.
 
 ## Tests
 
-```powershell
-# Backend (13 tests)
-cd "C:\Users\sachi\Videos\final TRACE\backend"
-python -m pytest tests/ -q
+```bash
+# Backend
+cd backend && python -m pytest tests/ -q
 
-# Frontend (9 live tests against the running backend + 1 mock test)
-cd "C:\Users\sachi\Videos\final TRACE\frontend"
-npx playwright test
-
-# Type check and production build
-npm run build
+# Frontend
+cd frontend && npx playwright test          # live + mock projects
+npm run build                               # tsc --noEmit + vite build
 ```
 
-The Playwright suite has two projects: `live` (the real backend on port 8000) and
-`mock` (the in-browser demo server on port 5174).
+CI (`.github/workflows/ci.yml`) runs backend tests and the frontend build + live
+Playwright suite on every push/PR to `main`.
 
 ## Demo data
 
-```powershell
-cd "C:\Users\sachi\Videos\final TRACE\backend"
-python scripts/seed_demo.py
+```bash
+cd backend && python scripts/seed_demo.py
 ```
 
-Seeds `audit-seed-paused` (Apple FY2026, two flagged items waiting for review) and
-`audit-seed-completed` (Microsoft, auto-approved). The Apple figures are the real
-FY2026 10-K values, so resuming the paused thread produces a meaningful XBRL
-comparison.
-
-The same thing is available from the UI: **Settings → Reset demo data** (or
-`POST /demo/reset`). It clears the workflow state and re-seeds the demo threads; the
-append-only audit log is never deleted.
+Seeds `audit-seed-paused` (Apple FY2026, two flagged items) and `audit-seed-completed`
+(Microsoft, auto-approved). Resettable from the UI (**Settings → Reset demo data**) or
+`POST /demo/reset`. The audit log is never deleted.
 
 ## Configuration
 
 | Variable | Where | Meaning |
 |---|---|---|
-| `GEMINI_API_KEY`, `GROQ_API_KEY` | `backend/.env` | The two LLM providers (required for live audits) |
-| `GEMINI_THINKING_BUDGET` | `backend/.env` | Gemini reasoning budget; `0` keeps an audit near 10-15s |
-| `SEC_USER_AGENT` | `backend/.env` | Contact string sent to SEC EDGAR (required by SEC policy) |
-| `DEMO_RESET_ENABLED` | `backend/.env` | Allow `POST /demo/reset` (default on) |
-| `DEMO_TAMPER_ENABLED` | `backend/.env` | Allow `POST /demo/tamper` (default off; it breaks the hash chain on purpose) |
-| `VITE_API_MODE` | `frontend/.env` | `http` for the real backend, `mock` for the in-browser demo |
-| `VITE_API_BASE` | `frontend/.env` | Backend base URL |
+| `GEMINI_API_KEY`, `GROQ_API_KEY` | `backend/.env` | LLM providers (required for live audits) |
+| `GEMINI_THINKING_BUDGET` | `backend/.env` | Gemini reasoning budget; `0` keeps an audit ~10–15 s |
+| `SEC_USER_AGENT`, `SEC_REQUEST_DELAY` | `backend/.env` | SEC fair-access policy |
+| `CONFIDENCE_HIGH_THRESHOLD`, `CONFIDENCE_WEIGHTS` | `backend/.env` | Confidence policy |
+| `AUDITOR_DB_PATH`, `AUDITOR_CHECKPOINT_DB` | `backend/.env` | Storage locations |
+| `MONGO_URI`, `MONGO_DB_NAME`, `MONGO_SERVER_SELECTION_TIMEOUT_MS` | `backend/.env` | Optional MongoDB switch-over |
+| `DEMO_RESET_ENABLED`, `DEMO_TAMPER_ENABLED`, `DEMO_FAILURE_MODE` | `backend/.env` | Demo controls |
+| `VITE_API_MODE`, `VITE_API_BASE` | `frontend/.env` | `mock` (default) / `http` |
 
-## Deploying to Render
+## Deploy
 
-The repository contains a [Render blueprint](render.yaml) that creates both
-services:
+Render blueprint: backend on Python runtime, frontend as static site, SPA rewrite,
+health check on `/health`. Full walkthrough: push to GitHub → Render Blueprint → supply
+the three secrets (`GEMINI_API_KEY`, `GROQ_API_KEY`, `VITE_API_BASE`) → set backend
+`CORS_ORIGINS` → save → verify `DATA MODE: Live`. See [render.yaml](render.yaml) for the
+declarative version.
 
-| Service | Type | What it serves |
-|---|---|---|
-| `trace-backend` | web (Python) | The FastAPI + LangGraph audit API |
-| `trace-frontend` | web (static) | The built Vite dashboard |
+## Documentation map
 
-### Step 1 — create the Blueprint
-
-1. Push this repository to GitHub (see below).
-2. In Render: **New → Blueprint** → select the repository → **Apply**.
-3. Render asks for the three secrets it cannot read from the repo:
-   - `GEMINI_API_KEY`
-   - `GROQ_API_KEY`
-   - `VITE_API_BASE` (leave it for now — step 3)
-
-### Step 2 — note the backend URL
-
-The backend is live within a couple of minutes at:
-
-```
-https://trace-backend.onrender.com
-```
-
-Check it: `https://trace-backend.onrender.com/health` must return
-`{"status":"ok","version":"2.0.0"}`.
-
-The free plan sleeps after 15 minutes of inactivity, so the first request can
-take ~30 seconds while the service wakes up. The dashboard says so explicitly
-instead of showing an empty page.
-
-### Step 3 — point the frontend at the backend
-
-1. Open the `trace-frontend` service → **Settings → Environment**.
-2. Set `VITE_API_BASE` to `https://trace-backend.onrender.com`.
-3. Set `CORS_ORIGINS` on `trace-backend` to include the frontend origin:
-   `http://localhost:5173,http://127.0.0.1:5173,https://trace-frontend.onrender.com`
-   (the blueprint already contains this value).
-4. Save on both services. Render rebuilds the frontend with the new API base.
-
-### Step 4 — verify
-
-Open `https://trace-frontend.onrender.com`. The header must show **DATA MODE:
-Live**. Deep links such as `/review` and `/filings/<thread_id>` work because the
-blueprint rewrites every path to `index.html`.
-
-### Durable data (optional)
-
-By default the audit log and the workflow checkpoints live in the service's
-ephemeral filesystem, so they are lost on the next deploy. To keep them:
-
-1. Create a **Disk** (1 GB is plenty) and attach it to `trace-backend` at
-   `/var/data`.
-2. Set `AUDITOR_DB_PATH=/var/data/auditor.db` and
-   `AUDITOR_CHECKPOINT_DB=/var/data/checkpoints.db` on the service.
-
-### Testing a production build locally
-
-```powershell
-cd "C:\Users\sachi\Videos\final TRACE\frontend"
-$env:VITE_API_MODE="http"; $env:VITE_API_BASE="http://127.0.0.1:8000"
-npm run build
-python scripts/serve-dist.py 4173 dist      # static server with SPA fallback
-npx playwright test e2e/production-build.spec.ts
-```
-
-That test drives the built `dist/` folder — exactly what Render serves — against
-the live backend, including deep links.
-
-## MongoDB (optional, environment-driven)
-
-MongoDB is **off by default** — the app uses the local SQLite files. Set one
-environment variable and the storage switches over, with no code change:
-
-| Variable | Meaning |
+| File | Purpose |
 |---|---|
-| `MONGO_URI` | Connection string, e.g. `mongodb+srv://user:pass@cluster.mongodb.net` |
-| `MONGO_DB_NAME` | Database name (default `trace`) |
-| `MONGO_SERVER_SELECTION_TIMEOUT_MS` | How long to wait for a server (default `8000`) |
-
-When `MONGO_URI` is set:
-
-- the **append-only audit log** moves to the `audit_logs` collection, keeping the
-  same SHA-256 hash chain (`prev_hash` → `row_hash`) and the same verifier;
-- the **workflow checkpoints** move to the `checkpoints` / `checkpoint_writes`
-  collections via LangGraph's `MongoDBSaver`;
-- the API contract, the UI and the audit-log format are **unchanged** — a row
-  produced by MongoDB hashes identically to the same row produced by SQLite.
-
-Check which backend is live at any time: `GET /health` returns
-`{"status":"ok","version":"2.0.0","storage":"MongoDB (trace)"}`, and the
-**Settings** page shows the same value.
-
-### On Render
-
-The blueprint already declares `MONGO_URI` as a secret (`sync: false`), so:
-
-1. Open the `trace-backend` service → **Settings → Environment**.
-2. Paste your Atlas connection string into `MONGO_URI`.
-3. Save — the service restarts and picks up MongoDB.
-
-Nothing else changes: no rebuild, no config edit.
-
-### Atlas checklist
-
-- Allow Render's outbound IPs, or set the cluster's IP access list to `0.0.0.0/0`
-  for a demo (tighter for production).
-- Use a **Database User** with read/write on the `trace` database, not the
-  Atlas admin user.
-- Atlas needs TLS — the connection string already includes `mongodb+srv://`.
-
-### Notes
-
-- The audit-log writer serialises inserts with a process-level lock and keeps
-  the chain head in a single document. Run **one** backend instance (the Render
-  free tier is one instance). Multiple instances would need a distributed lock.
-- The MongoDB tests run against an in-process mock, so CI needs no server:
-
-```powershell
-cd "C:\Users\sachi\Videos\final TRACE\backend"
-python -m pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest tests/ -q        # 30 tests, no MongoDB required
-```
-
-## Push to GitHub
-
-```powershell
-cd "C:\Users\sachi\Videos\final TRACE"
-git remote add origin https://github.com/<you>/<repo>.git
-git push -u origin main
-```
-
-The repository already ignores `.env`, `node_modules`, `data/` and `*.db`, so the
-API keys stay out of git. Only `.env.example` files are tracked.
+| [vision.md](vision.md) | Product vision, pillars, non-goals |
+| [workflow.md](workflow.md) | Runtime audit flow, routes, resume, status machine |
+| [GATES.md](GATES.md) | Demo gates, quality gates, judge questions |
+| [frontend/docs/architecture.md](frontend/docs/architecture.md) | UI architecture deep-dive |
+| [frontend/docs/demo_script.md](frontend/docs/demo_script.md) | Guided demo script |
+| [frontend/docs/backup-recording-plan.md](frontend/docs/backup-recording-plan.md) | Backup video / cache recording plan |
 
 ## Notes for production
 
-- The workflow is stateful and uses SQLite checkpoints plus an append-only audit log
-  under `backend/data/`. A hosted deployment should point `AUDITOR_DB_PATH` and
-  `AUDITOR_CHECKPOINT_DB` at durable storage.
-- CORS is currently restricted to `http://localhost:5173` and
-  `http://127.0.0.1:5173`; add the deployed frontend origin before going live.
-- Secrets live in `.env` files that are git-ignored. Only `.env.example` is tracked.
+- The workflow is stateful (SQLite checkpoints + append-only log under `backend/data/`);
+  point `AUDITOR_DB_PATH` / `AUDITOR_CHECKPOINT_DB` at durable storage.
+- CORS defaults cover localhost; set `CORS_ORIGINS` for a deployed frontend origin.
+- Secrets live in git-ignored `.env`; only `.env.example` is tracked.

@@ -37,3 +37,22 @@ def test_extractor_disagreement_caps_at_sixty():
     weights = {"extractor_agreement": 1.0, "concept_match": 1.0}
     result = confidence.computeConfidence(signals, weights)
     assert result["score"] <= 0.60
+
+
+def test_metric_confidence_applies_hard_caps():
+    """The metric-level scorer must honor the hard caps instead of only the
+    pure-functions helper: an ungrounded value caps at 0.50 and an extractor
+    disagreement caps at 0.60, otherwise good-looking signals hide evidence gaps.
+    """
+    metric = confidence.ExtractedMetric(
+        metric_name="Revenue",
+        value=391035.0,
+        unit="USD Millions",
+        period="FY2024",
+        source_snippet="Net sales for fiscal years ended 2020 through 2023",
+        confidence=0.95,
+        extractor_agreement="disagree",
+    )
+    result = confidence.compute_confidence(metric, filing_metadata={"fiscal_year": "FY2024"})
+    assert result["score"] <= 0.60
+    assert metric.confidence_score <= 0.60

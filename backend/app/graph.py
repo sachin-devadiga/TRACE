@@ -94,6 +94,7 @@ class AuditState(TypedDict, total=False):
 
     thread_id: str
     cik: str
+    accession_number: str
     company_name: str
     confidence_threshold: float
     yoy_threshold_pct: float
@@ -493,7 +494,7 @@ def fetch_node(state: AuditState) -> dict[str, Any]:
     if not cik:
         raise ValueError("AuditState.cik is required.")
 
-    filing = fetch_latest_10k_tables(cik)
+    filing = fetch_latest_10k_tables(cik, state.get("accession_number") or None)
     tables = filing.get("tables") or []
     if not tables:
         raise RuntimeError(f"No financial tables returned for CIK {cik}.")
@@ -787,6 +788,26 @@ def _fact_usd(fact: dict[str, Any]) -> float:
     return float(fact["value"]) * 1_000_000.0
 
 
+def _metric_confidence(metric: dict[str, Any] | None) -> float | None:
+    """Return the deterministic confidence score for a serialized metric.
+
+    ``original_metrics`` is captured before validation runs, so it never
+    carries ``confidence_score``.  The scored copy in ``extracted_metrics``
+    does, and is preferred.
+    """
+    if not metric:
+        return None
+    for key in ("confidence_score", "confidence"):
+        value = metric.get(key)
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def _metric_usd(metric: dict[str, Any], *, original: bool = False) -> float | None:
     """Return a serialized metric in full USD, normalizing legacy records."""
     if original and metric.get("original_value") is not None:
@@ -840,6 +861,9 @@ def _build_accuracy_report(
             final_metric.get("value") if final_metric is not None else None
         )
         audited_usd = _metric_usd(final_metric) if final_metric is not None else None
+        confidence = _metric_confidence(final_metric)
+        if confidence is None:
+            confidence = _metric_confidence(original)
 
         if fact is None or original_usd is None:
             details.append(
@@ -859,7 +883,7 @@ def _build_accuracy_report(
                     "match": False,
                     "original_match": None,
                     "final_match": None,
-                    "confidence": original.get("confidence_score"),
+                    "confidence": confidence,
                     "confidence_label": original.get("confidence_label"),
                     "note": "No XBRL fact available for this metric role (no ground truth).",
                 }
@@ -919,8 +943,8 @@ def _build_accuracy_report(
                 "original_match": original_match,
                 "final_match": final_match,
                 "match": bool(final_match) if final_match is not None else original_match,
-                "confidence": original.get("confidence_score"),
-                "confidence_label": original.get("confidence_label"),
+                "confidence": confidence,
+                "confidence_label": final_metric.get("confidence_label") if final_metric is not None else original.get("confidence_label"),
             }
         )
 
@@ -1168,7 +1192,9 @@ def finalize_node(state: AuditState) -> dict[str, Any]:
 
     metadata = state.get("filing_metadata") or {}
     try:
-        truth = fetch_xbrl_ground_truth(cik)
+        truth = fetch_xbrl_ground_truth(
+            cik, accession=metadata.get("accession_number") or None
+        )
         accuracy_report = _build_accuracy_report(state, truth)
     except Exception as error:  # noqa: BLE001 - finalize must still record the audit
         logger.warning("XBRL ground-truth lookup failed for CIK %s: %s", cik, error)

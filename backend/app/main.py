@@ -54,6 +54,10 @@ class StartAuditRequest(BaseModel):
     cik: str = Field(min_length=1, description="SEC CIK, with or without leading zeros.")
     confidence_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
     yoy_threshold_pct: float = Field(default=30.0, ge=0.0)
+    accession_number: str | None = Field(
+        default=None,
+        description="Audit this exact EDGAR filing instead of the newest 10-K.",
+    )
     demo_only: bool = Field(
         default=False,
         description=(
@@ -270,6 +274,7 @@ def start_audit(request: StartAuditRequest) -> dict[str, Any]:
     initial_state = {
         "thread_id": thread_id,
         "cik": request.cik,
+        "accession_number": request.accession_number or "",
         "company_name": "",
         "confidence_threshold": request.confidence_threshold,
         "yoy_threshold_pct": request.yoy_threshold_pct,

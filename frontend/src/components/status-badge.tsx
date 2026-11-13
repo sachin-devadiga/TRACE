@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { AuditStatusValue, DecisionState, EscalationType, Severity } from "@/api/types";
 import { cn } from "@/lib/utils";
+import { formatConfidence } from "@/lib/format";
 import {
   escalationExplanation,
   escalationLabel,
@@ -81,7 +82,7 @@ export function ConfidenceBadge({ confidence, label }: { confidence: number; lab
   const tone = label === "HIGH" ? "bg-success/15 text-success" : "bg-danger/15 text-danger";
   return (
     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", tone)} data-testid="confidence-badge">
-      {label} confidence · {(confidence * 100).toFixed(0)}%
+      {label} confidence · {formatConfidence(confidence)}
     </span>
   );
 }

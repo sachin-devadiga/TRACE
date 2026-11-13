@@ -441,10 +441,10 @@ def compute_confidence(
         "extractor_agreement": _extractor_agreement_signal(metric),
         "llm_confidence": max(0.0, min(float(metric.confidence), 1.0)),
     }
-    weights = CONFIDENCE_CONFIG["weights"]
-    total_weight = sum(weights.values()) or 1.0
-    score = sum(signals[key] * weights.get(key, 0.0) for key in signals) / total_weight
-    score = round(max(0.0, min(score, 1.0)), 4)
+    # Single source of truth for the formula: renormalized weighted average
+    # plus the hard caps (ungrounded <= 0.50, extractor disagreement <= 0.60).
+    computed = computeConfidence(signals, CONFIDENCE_CONFIG["weights"])
+    score = float(computed["score"])
     label = label_confidence(score, threshold)
 
     metric.confidence_score = score

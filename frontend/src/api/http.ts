@@ -7,6 +7,7 @@ import type {
   AuditLogRow,
   AuditStatus,
   CompanyInfo,
+  FilingCandidate,
   HealthResponse,
   ResumePayload,
   StartAuditRequest,
@@ -36,6 +37,21 @@ export class HttpTraceApi implements TraceApi {
 
   async listCompanies(): Promise<CompanyInfo[]> {
     return request<CompanyInfo[]>("/companies");
+  }
+
+  async searchCompanies(query: string): Promise<CompanyInfo[]> {
+    // Any company on EDGAR, not just the five the demo configures.
+    return request<CompanyInfo[]>(`/companies/search?q=${encodeURIComponent(query)}`);
+  }
+
+  async listFilings(cik: string, form?: string): Promise<FilingCandidate[]> {
+    const query = new URLSearchParams({ cik, limit: "50" });
+    if (form) query.set("form", form);
+    return request<FilingCandidate[]>(`/filings?${query.toString()}`);
+  }
+
+  async listFilingForms(): Promise<string[]> {
+    return request<string[]>("/filings/forms");
   }
 
   async startAudit(payload: StartAuditRequest): Promise<AuditStatus> {

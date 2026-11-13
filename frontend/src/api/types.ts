@@ -157,6 +157,20 @@ export interface CompanyInfo {
   ticker: string;
   cik: string;
   industry: string;
+  /** True for the five companies the demo ships with; absent on the plain list. */
+  configured?: boolean;
+}
+
+/** One row from the EDGAR submissions API (`GET /filings`). */
+export interface FilingCandidate {
+  cik: string;
+  accession_number: string;
+  form: string;
+  filing_date: string;
+  report_date: string | null;
+  primary_document: string;
+  auditable: boolean;
+  fiscal_year: number | null;
 }
 
 export interface ThreadSummary {
@@ -215,6 +229,8 @@ export interface StartAuditRequest {
   confidence_threshold: number;
   yoy_threshold_pct: number;
   demo_only: boolean;
+  /** Audit this exact EDGAR filing instead of the newest 10-K. */
+  accession_number?: string;
 }
 
 export interface ReviewDecisionInput {

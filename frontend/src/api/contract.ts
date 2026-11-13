@@ -4,6 +4,7 @@ import type {
   AuditLogRow,
   AuditStatus,
   CompanyInfo,
+  FilingCandidate,
   HealthResponse,
   ResumePayload,
   StartAuditRequest,
@@ -14,6 +15,9 @@ import type {
 export interface TraceApi {
   health(): Promise<HealthResponse>;
   listCompanies(): Promise<CompanyInfo[]>;
+  searchCompanies(query: string): Promise<CompanyInfo[]>;
+  listFilings(cik: string, form?: string): Promise<FilingCandidate[]>;
+  listFilingForms(): Promise<string[]>;
   startAudit(request: StartAuditRequest): Promise<AuditStatus>;
   listThreads(): Promise<ThreadSummary[]>;
   getStatus(threadId: string): Promise<AuditStatus>;
