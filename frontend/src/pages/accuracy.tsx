@@ -82,10 +82,6 @@ export function AccuracyPage() {
           <h2 className="text-lg font-semibold">Accuracy</h2>
           <Badge variant="secondary">Final vs XBRL</Badge>
         </div>
-      </div>
-      <div className="rounded-xl border p-3 text-sm text-muted-foreground">
-        Snapshot values equal XBRL by construction, so accuracy is not a measurement of extraction quality; real accuracy comes from live runs in http mode.
-      </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={includeDemo} onCheckedChange={setIncludeDemo} aria-label="Include test runs" />
@@ -98,6 +94,9 @@ export function AccuracyPage() {
             {isFetching ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
+      </div>
+      <div className="rounded-xl border p-3 text-sm text-muted-foreground">
+        Snapshot values equal XBRL by construction, so accuracy is not a measurement of extraction quality; real accuracy comes from live runs in http mode.
       </div>
 
       {reports.length === 0 ? (
