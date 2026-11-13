@@ -121,11 +121,22 @@ function buildCompanies(): CompanyFixture[] {
       // Find revenue metric
       const revMetric = metricsArr.find(m => m.metric_name === 'Revenue');
       if (revMetric) {
+        const trueRev = c.metrics['Revenue']?.value_usd || revMetric.value_usd;
+        const priorRev = revMetric.prior_year_value_usd || c.metrics['Revenue']?.prior_year_value_usd;
+        let yoyStr = 'n/a';
+        if (priorRev && priorRev !== 0) {
+          const yoy = ((trueRev - priorRev) / Math.abs(priorRev)) * 100;
+          yoyStr = `${yoy >= 0 ? '+' : ''}${yoy.toFixed(2)}%`;
+        }
         flaggedItems.push(flag(
-          { ...revMetric, decision_state: 'FLAGGED' } as Metric,
+          { ...revMetric, decision_state: 'PENDING' } as Metric,
           'HIGH',
           ['EXTRACTION_RISK'],
-          ['Injected extraction error detected', 'Extracted value does not match XBRL fact'],
+          [
+            `Extracted value ${revMetric.value_usd.toLocaleString('en-US')} vs XBRL ${trueRev.toLocaleString('en-US')}`,
+            `Prior year ${priorRev != null ? priorRev.toLocaleString('en-US') : 'n/a'}, YoY ${yoyStr}`,
+            'Rule: XBRL_MISMATCH (threshold: exact match)',
+          ],
           ['INJECTED_ERROR', 'XBRL_MISMATCH']
         ));
       }

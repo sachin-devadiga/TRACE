@@ -211,7 +211,7 @@ export class MockTraceApi {
 
     if (willPause) {
       thread.metrics = thread.metrics.map((m) =>
-        escalated.includes(m.metric_name) ? { ...m, decision_state: "FLAGGED" } : { ...m, decision_state: "PENDING" }
+        escalated.includes(m.metric_name) ? { ...m, decision_state: "PENDING" } : { ...m, decision_state: "AUTO_APPROVED" }
       );
       setStatus("PAUSED_FOR_REVIEW", 5, "Automated decision escalated to human review");
       return;

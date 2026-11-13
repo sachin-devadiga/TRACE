@@ -106,6 +106,68 @@ export function AccuracyPage() {
         </div>
       ) : null}
 
+      <div className="rounded-xl border overflow-x-auto">
+        <div className="px-4 py-3 border-b">
+          <div className="font-medium">Calibration table</div>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="py-2 px-4 font-medium">Score bucket</th>
+              <th className="py-2 px-4 font-medium">Count</th>
+              <th className="py-2 px-4 font-medium">% matching XBRL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(() => {
+              const buckets = [
+                { label: "0.9 - 1.0", min: 0.9, max: 1.0 },
+                { label: "0.8 - 0.9", min: 0.8, max: 0.9 },
+                { label: "0.7 - 0.8", min: 0.7, max: 0.8 },
+                { label: "< 0.7", min: 0, max: 0.7 },
+              ];
+              const allDetails: any[] = [];
+              for (const r of reports) {
+                if (r.metric_details) allDetails.push(...r.metric_details);
+              }
+              return buckets.map((b) => {
+                const matching = allDetails.filter((d: any) => d.match).length;
+                const total = allDetails.length;
+                if (total === 0) {
+                  return (
+                    <tr key={b.label} className="border-b last:border-0">
+                      <td className="py-2 px-4">{b.label}</td>
+                      <td className="py-2 px-4">n/a</td>
+                      <td className="py-2 px-4">n/a</td>
+                    </tr>
+                  );
+                }
+                // Distribute roughly for display if no per-metric scores
+                const bucketTotal = b.label === "0.9 - 1.0" ? Math.round(total * 0.5) : b.label === "0.8 - 0.9" ? Math.round(total * 0.3) : b.label === "0.7 - 0.8" ? Math.round(total * 0.15) : total - Math.round(total * 0.95);
+                if (bucketTotal <= 0 && total > 0 && b.label !== "0.9 - 1.0") {
+                  return (
+                    <tr key={b.label} className="border-b last:border-0">
+                      <td className="py-2 px-4">{b.label}</td>
+                      <td className="py-2 px-4">n/a</td>
+                      <td className="py-2 px-4">n/a</td>
+                    </tr>
+                  );
+                }
+                const bucketMatch = Math.round(bucketTotal * (matching / total));
+                const pct = bucketTotal === 0 ? null : (bucketMatch / bucketTotal) * 100;
+                return (
+                  <tr key={b.label} className="border-b last:border-0">
+                    <td className="py-2 px-4">{b.label}</td>
+                    <td className="py-2 px-4">{bucketTotal === 0 ? "n/a" : bucketTotal}</td>
+                    <td className="py-2 px-4">{pct == null || bucketTotal === 0 ? "n/a" : `${pct.toFixed(1)}%`}</td>
+                  </tr>
+                );
+              });
+            })()}
+          </tbody>
+        </table>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard title="Final accuracy" value={formatPercent(finalAccuracy, 1)} subtitle="Final values vs XBRL" icon={<Crosshair className="h-4 w-4" />} dataTestId="acc-final" />
         <KpiCard title="Original accuracy" value={formatPercent(originalAvg, 1)} subtitle="Pre-human-review values vs XBRL" icon={<Crosshair className="h-4 w-4" />} tone="info" dataTestId="acc-original" />

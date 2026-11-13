@@ -22,6 +22,7 @@ __all__ = [
     "CONFIDENCE_WEIGHTS",
     "apply_extractor_agreement",
     "compare_extractor_batches",
+    "computeConfidence",
     "compute_confidence",
     "label_confidence",
     "metric_role",
@@ -69,11 +70,20 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+# Hard caps as specified
+CONFIDENCE_HARD_CAPS = {
+    "grounding": 0.50,  # grounding 0 caps at 0.50
+    "snippet_grounding": 0.50,
+    "extractor_disagreement": 0.60,
+    "extractor_agreement": 0.60,  # extractor disagreement caps at 0.60
+}
+
 CONFIDENCE_CONFIG: dict[str, Any] = {
     "weights": _load_weights(),
     "high_confidence_threshold": _env_float("CONFIDENCE_HIGH_THRESHOLD", 0.85),
     "prior_ratio_min": _env_float("CONFIDENCE_PRIOR_RATIO_MIN", 0.02),
     "prior_ratio_max": _env_float("CONFIDENCE_PRIOR_RATIO_MAX", 50.0),
+    "caps": CONFIDENCE_HARD_CAPS,
 }
 
 _KNOWN_ROLES = {
@@ -356,6 +366,54 @@ def label_confidence(score: float, threshold: float | None = None) -> str:
         else float(threshold)
     )
     return "HIGH" if float(score) >= cutoff else "LOW"
+
+
+def computeConfidence(signals: dict[str, Any], weights: dict[str, float] | None = None) -> dict[str, Any]:
+    """Compute confidence with renormalization over available signals and hard caps."""
+    if weights is None:
+        weights = CONFIDENCE_CONFIG.get("weights", {})
+    config = CONFIDENCE_CONFIG
+    caps = config.get("caps", CONFIDENCE_HARD_CAPS)
+    
+    # Normalize signals to floats
+    norm_signals: dict[str, float] = {}
+    for k, v in (signals or {}).items():
+        try:
+            norm_signals[k] = float(v)
+        except (TypeError, ValueError):
+            continue
+    
+    breakdown = []
+    # Compute weighted sum over available signals with renormalization
+    total_weight = 0.0
+    for k in norm_signals:
+        w = float(weights.get(k, 0.0)) if weights else 0.0
+        if w > 0:
+            total_weight += w
+            breakdown.append({"signal": k, "score": norm_signals[k], "weight": w})
+    
+    if total_weight == 0:
+        score = 0.0
+    else:
+        score = sum(norm_signals.get(b["signal"], 0.0) * b["weight"] for b in breakdown) / total_weight
+    
+    # Apply hard caps
+    # grounding 0 caps at 0.50
+    if norm_signals.get("snippet_grounding", 1.0) == 0 or norm_signals.get("grounding", 1.0) == 0:
+        score = min(score, caps.get("grounding", caps.get("snippet_grounding", 0.50)))
+    if norm_signals.get("snippet_grounding") == 0:
+        score = min(score, caps.get("snippet_grounding", 0.50))
+    # extractor disagreement caps at 0.60
+    if norm_signals.get("extractor_agreement") == 0 or norm_signals.get("extractor_disagreement", 0) > 0:
+        score = min(score, caps.get("extractor_disagreement", caps.get("extractor_agreement", 0.60)))
+    
+    score = max(0.0, min(float(score), 1.0))
+    return {
+        "score": round(score, 4),
+        "signals": norm_signals,
+        "weights": {b["signal"]: b["weight"] for b in breakdown},
+        "breakdown": breakdown,
+    }
 
 
 def compute_confidence(
