@@ -192,9 +192,9 @@ export function ReviewQueuePage() {
         <Progress value={progressPct} />
       </div>
 
-      <div className="grid flex-1 gap-4 overflow-hidden lg:grid-cols-5">
-        <Card className="lg:col-span-2 lg:overflow-hidden">
-          <CardHeader className="pb-3">
+      <div className="grid flex-1 gap-4 overflow-hidden lg:grid-cols-5 min-h-0">
+        <Card className="lg:col-span-2 flex flex-col overflow-hidden h-full">
+          <CardHeader className="pb-3 flex-shrink-0">
             <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="PENDING">Pending</TabsTrigger>
@@ -203,7 +203,7 @@ export function ReviewQueuePage() {
               </TabsList>
             </Tabs>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3 overflow-y-auto">
+          <CardContent className="flex flex-1 flex-col gap-3 overflow-y-auto min-h-0">
             {visibleItems.length === 0 ? <p className="text-sm text-muted-foreground">No items in this view.</p> : null}
             {visibleItems.map((f) => (
               <button
@@ -238,7 +238,7 @@ export function ReviewQueuePage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3 lg:overflow-hidden">
+        <Card className="lg:col-span-3 flex flex-col overflow-hidden h-full">
           {selectedFlagged ? (
             <ItemDetail
               flagged={selectedFlagged}
@@ -325,8 +325,8 @@ function ItemDetail({
   };
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <CardHeader className="flex items-start justify-between space-y-0">
+    <div className="flex h-full flex-col overflow-y-auto min-h-0">
+      <CardHeader className="flex items-start justify-between space-y-0 flex-shrink-0">
         <div>
           <div className="flex items-center gap-2">
             <CardTitle className="text-xl">{flagged.metric_name}</CardTitle>
