@@ -16,6 +16,7 @@ export function OverviewPage() {
   const pending = threadList.filter((t) => t.status === "PAUSED_FOR_REVIEW" || t.status === "HUMAN_REVIEWED");
   const completed = threadList.filter((t) => t.status === "COMPLETED" || t.status === "AUTO_APPROVED");
   const autoApprovedCount = threadList.reduce((acc, t) => acc + (t.auto_approved_count ?? 0), 0);
+  const falseAutoApprovals = threadList.reduce((acc, t) => acc + (t.false_auto_approvals ?? 0), 0);
   const escalatedCount = threadList.reduce((acc, t) => acc + (t.flagged_count ?? 0), 0);
   const reported = threadList.filter((t) => t.status === "COMPLETED" && t.accuracy_pct != null);
   const accuracyPct = reported.length ? reported.reduce((acc, t) => acc + (t.accuracy_pct ?? 0), 0) / reported.length : 0;
@@ -57,10 +58,11 @@ export function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <KpiCard title="Pending reviews" value={String(pending.length)} subtitle="Awaiting reviewer action" icon={<UserCheck className="h-4 w-4" />} tone="warning" dataTestId="kpi-pending" />
         <KpiCard title="Completed audits" value={String(completed.length)} subtitle="Across all companies" icon={<CheckCircle2 className="h-4 w-4" />} dataTestId="kpi-completed" />
         <KpiCard title="Auto-approved" value={String(autoApprovedCount)} subtitle="No escalation required" icon={<Bot className="h-4 w-4" />} tone="success" dataTestId="kpi-auto-approved" />
+        <KpiCard title="False auto-approvals" value={String(falseAutoApprovals)} subtitle="Auto-approved but wrong (target 0)" icon={<ShieldCheck className="h-4 w-4" />} tone={falseAutoApprovals === 0 ? "success" : "danger"} dataTestId="kpi-false-auto-approved" />
         <KpiCard title="Escalated" value={String(escalatedCount)} subtitle="Flagged for human review" icon={<AlertTriangle className="h-4 w-4" />} tone="danger" dataTestId="kpi-escalated" />
         <KpiCard title="Accuracy" value={formatPercent(accuracyPct, 1)} subtitle="Final vs. XBRL" icon={<GaugeIcon className="h-4 w-4" />} tone="info" dataTestId="kpi-accuracy" />
         <KpiCard title="Escalation precision" value={formatPercent(precisionPct, 1)} subtitle="Escalated items resolved correctly" icon={<ShieldCheck className="h-4 w-4" />} tone="success" dataTestId="kpi-precision" />

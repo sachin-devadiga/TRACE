@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTraceApi } from "../api/client";
-import type { AuditLogFilters, StartAuditRequest } from "../api/types";
+import type { AuditLogFilters, ResumePayload, StartAuditRequest } from "../api/types";
 
 export const api = createTraceApi();
 
@@ -82,7 +82,7 @@ export function useStartAudit() {
 export function useResume() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ threadId, payload }: { threadId: string; payload: { decisions: { metric_name: string; decision: "APPROVED" | "CORRECTED" | "REJECTED"; corrected_value?: number; reviewer_notes?: string }[] } }) =>
+    mutationFn: ({ threadId, payload }: { threadId: string; payload: ResumePayload }) =>
       api.resume(threadId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threads"] });

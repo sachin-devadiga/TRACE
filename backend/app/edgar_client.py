@@ -12,7 +12,9 @@ The public SEC endpoints used here are:
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import json
 import logging
 import os
 import re
@@ -20,8 +22,9 @@ import threading
 import time
 import warnings
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Iterable
 
 import requests
@@ -41,9 +44,11 @@ __all__ = [
     "SEC_RETRY_BASE_DELAY",
     "SEC_USER_AGENT",
     "TARGET_COMPANIES",
+    "cache_only",
     "fetch_latest_10k_tables",
     "fetch_xbrl_ground_truth",
     "normalize_cik",
+    "sec_cache_dir",
 ]
 
 DEFAULT_SEC_USER_AGENT = "MineArenaAuditor team@bietdavangere.edu"
@@ -67,6 +72,108 @@ except ValueError:
     SEC_RETRY_BASE_DELAY = 1.0
 
 _RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+# EDGAR responses are cached on disk so an audit can be replayed with the
+# network disabled.  The cache is read-through: online requests refresh it and
+# a network failure falls back to the last successful response.
+_CACHE_ROOT = Path(__file__).resolve().parent.parent / "data" / "sec_cache"
+
+
+def sec_cache_dir() -> Path:
+    """Return the cache directory, allowing tests/deployments to override it."""
+    override = (os.getenv("SEC_CACHE_DIR") or "").strip()
+    return Path(override).expanduser().resolve() if override else _CACHE_ROOT
+
+
+def cache_only() -> bool:
+    """Return True when callers have requested strict offline mode."""
+    return any(
+        (os.getenv(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+        for name in ("SEC_CACHE_ONLY", "TRACE_OFFLINE")
+    )
+
+
+def _cache_tag_from_url(url: str) -> str:
+    match = re.search(r"CIK(\d{10})", url, re.IGNORECASE)
+    return match.group(1) if match else "sec"
+
+
+def _cache_path(url: str, cache_tag: str | None = None) -> Path:
+    tag = re.sub(r"[^0-9A-Za-z]+", "", str(cache_tag or _cache_tag_from_url(url)))
+    tag = tag[:24] or "sec"
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
+    return sec_cache_dir() / f"{tag}-{digest}.json"
+
+
+class _CachedResponse:
+    """Small response shim so cached and live bytes are interchangeable."""
+
+    def __init__(
+        self,
+        *,
+        url: str,
+        body: bytes,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        fetched_at: str | None = None,
+    ) -> None:
+        self.url = url
+        self.content = body
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.fetched_at = fetched_at or ""
+
+    @property
+    def text(self) -> str:
+        encoding = "utf-8"
+        content_type = self.headers.get("content-type", "")
+        match = re.search(r"charset=([\w-]+)", content_type, re.IGNORECASE)
+        if match:
+            encoding = match.group(1)
+        return self.content.decode(encoding, errors="replace")
+
+    def json(self) -> Any:
+        return json.loads(self.text)
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code} for {self.url}")
+
+
+def _read_cache(path: Path) -> _CachedResponse | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        body = base64.b64decode(payload.get("body_b64") or "")
+        return _CachedResponse(
+            url=str(payload.get("url") or ""),
+            body=body,
+            status_code=int(payload.get("status_code") or 200),
+            headers=dict(payload.get("headers") or {}),
+            fetched_at=str(payload.get("fetched_at") or ""),
+        )
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _write_cache(path: Path, response: Any) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "url": str(getattr(response, "url", "")),
+            "status_code": int(getattr(response, "status_code", 200)),
+            "headers": {
+                key: value
+                for key, value in dict(getattr(response, "headers", {}) or {}).items()
+                if key.lower() in {"content-type", "content-encoding"}
+            },
+            "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "body_b64": base64.b64encode(bytes(response.content)).decode("ascii"),
+        }
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        temporary.write_text(json.dumps(payload), encoding="utf-8")
+        temporary.replace(path)
+    except OSError as error:  # a read-only cache must not break a live audit
+        logger.warning("Could not write SEC cache %s: %s", path, error)
 
 TARGET_COMPANIES: dict[str, dict[str, str]] = {
     "Apple": {"ticker": "AAPL", "cik": "0000320193"},
@@ -115,7 +222,7 @@ def _retry_delay(attempt: int, response: requests.Response | None = None) -> flo
     return min(delay, 10.0)
 
 
-def _get(url: str, *, timeout: float = 30.0) -> requests.Response:
+def _get_network(url: str, *, timeout: float = 30.0) -> requests.Response:
     """GET an SEC resource with retries for dropped connections and 5xx/429.
 
     SEC EDGAR occasionally closes an otherwise valid connection (especially for
@@ -166,6 +273,48 @@ def _get(url: str, *, timeout: float = 30.0) -> requests.Response:
     # The loop either returns a response or raises; this keeps type checkers and
     # future edits honest if the retry policy is changed.
     raise RuntimeError(f"SEC request failed after {SEC_MAX_ATTEMPTS} attempts: {last_error}")
+
+
+def _get(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    cache_tag: str | None = None,
+) -> requests.Response | _CachedResponse:
+    """Return an SEC response, using the on-disk cache for offline replay.
+
+    Online requests refresh the cache.  If the network is unavailable (or
+    ``SEC_CACHE_ONLY``/``TRACE_OFFLINE`` is set), the most recent successful
+    response is returned instead.  A cache miss in strict offline mode raises a
+    clear error rather than silently fabricating data.
+    """
+    path = _cache_path(url, cache_tag)
+    if cache_only():
+        cached = _read_cache(path)
+        if cached is None:
+            raise RuntimeError(
+                f"Offline mode is enabled but no cached SEC response exists for {url}. "
+                "Run the audit once while online, or unset SEC_CACHE_ONLY/TRACE_OFFLINE."
+            )
+        logger.info("Using cached SEC response for %s", url)
+        return cached
+
+    try:
+        response = _get_network(url, timeout=timeout)
+    except (requests.RequestException, RuntimeError) as error:
+        cached = _read_cache(path)
+        if cached is None:
+            raise
+        logger.warning(
+            "SEC request failed (%s: %s); falling back to cached response from %s.",
+            type(error).__name__,
+            error,
+            cached.fetched_at or "an earlier run",
+        )
+        return cached
+
+    _write_cache(path, response)
+    return response
 
 
 @lru_cache(maxsize=32)
@@ -641,7 +790,7 @@ def fetch_latest_10k_tables(cik: str) -> dict[str, Any]:
         filing["accession_number"],
         filing["primary_document"],
     )
-    html = _get(filing_url, timeout=60.0).content
+    html = _get(filing_url, timeout=60.0, cache_tag=cik).content
     soup = BeautifulSoup(html, "lxml")
     tables = _extract_financial_tables(soup)
 

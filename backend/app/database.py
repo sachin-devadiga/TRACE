@@ -214,6 +214,10 @@ def insert_audit_log(
             "reviewer_notes": reviewer_notes,
             "timestamp": timestamp or _utc_timestamp(),
         }
+        # Serialize the read of the previous hash and the append.  Without this
+        # two parallel audits could read the same predecessor and fork the
+        # hash chain even though SQLite serializes the writes themselves.
+        connection.execute("BEGIN IMMEDIATE")
         prev_hash = _last_row_hash(connection)
         row_hash = _compute_row_hash(row, prev_hash)
         cursor = connection.execute(

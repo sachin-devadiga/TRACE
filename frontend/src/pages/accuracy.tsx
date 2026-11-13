@@ -29,10 +29,15 @@ export function AccuracyPage() {
     .map((t) => t.escalation_precision_pct)
     .filter((v): v is number => v != null);
   const precisionAvg = average(precisionValues);
+  const falseAutoApprovals = reports.reduce((acc, t) => acc + (t.false_auto_approvals ?? 0), 0);
+  const escalationRates = reports
+    .map((t) => t.escalation_rate_pct)
+    .filter((v): v is number => v != null);
+  const escalationRateAvg = average(escalationRates);
 
   const chartData = reports.map((t) => ({
     ticker: t.ticker,
-    accuracy: (t.accuracy_pct ?? 0) * 100,
+    accuracy: t.accuracy_pct ?? 0,
   }));
 
   const metricDetails: MetricAccuracyDetail[] = useMemo(() => {
@@ -119,59 +124,40 @@ export function AccuracyPage() {
             </tr>
           </thead>
           <tbody>
-            {(() => {
-              const buckets = [
-                { label: "0.9 - 1.0", min: 0.9, max: 1.0 },
-                { label: "0.8 - 0.9", min: 0.8, max: 0.9 },
-                { label: "0.7 - 0.8", min: 0.7, max: 0.8 },
-                { label: "< 0.7", min: 0, max: 0.7 },
-              ];
-              const allDetails: any[] = [];
-              for (const r of reports) {
-                if (r.metric_details) allDetails.push(...r.metric_details);
-              }
-              return buckets.map((b) => {
-                const matching = allDetails.filter((d: any) => d.match).length;
-                const total = allDetails.length;
-                if (total === 0) {
-                  return (
-                    <tr key={b.label} className="border-b last:border-0">
-                      <td className="py-2 px-4">{b.label}</td>
-                      <td className="py-2 px-4">n/a</td>
-                      <td className="py-2 px-4">n/a</td>
-                    </tr>
-                  );
-                }
-                // Distribute roughly for display if no per-metric scores
-                const bucketTotal = b.label === "0.9 - 1.0" ? Math.round(total * 0.5) : b.label === "0.8 - 0.9" ? Math.round(total * 0.3) : b.label === "0.7 - 0.8" ? Math.round(total * 0.15) : total - Math.round(total * 0.95);
-                if (bucketTotal <= 0 && total > 0 && b.label !== "0.9 - 1.0") {
-                  return (
-                    <tr key={b.label} className="border-b last:border-0">
-                      <td className="py-2 px-4">{b.label}</td>
-                      <td className="py-2 px-4">n/a</td>
-                      <td className="py-2 px-4">n/a</td>
-                    </tr>
-                  );
-                }
-                const bucketMatch = Math.round(bucketTotal * (matching / total));
-                const pct = bucketTotal === 0 ? null : (bucketMatch / bucketTotal) * 100;
-                return (
-                  <tr key={b.label} className="border-b last:border-0">
-                    <td className="py-2 px-4">{b.label}</td>
-                    <td className="py-2 px-4">{bucketTotal === 0 ? "n/a" : bucketTotal}</td>
-                    <td className="py-2 px-4">{pct == null || bucketTotal === 0 ? "n/a" : `${pct.toFixed(1)}%`}</td>
-                  </tr>
-                );
-              });
-            })()}
+            {[
+              { label: "0.9 - 1.0", min: 0.9, max: 1.01 },
+              { label: "0.8 - 0.9", min: 0.8, max: 0.9 },
+              { label: "0.7 - 0.8", min: 0.7, max: 0.8 },
+              { label: "< 0.7", min: 0, max: 0.7 },
+            ].map((bucket) => {
+              const items = metricDetails.filter(
+                (d) =>
+                  typeof d.confidence === "number" &&
+                  d.confidence >= bucket.min &&
+                  d.confidence < bucket.max &&
+                  d.has_ground_truth !== false &&
+                  d.match !== null,
+              );
+              const matches = items.filter((d) => d.match === true).length;
+              const pct = items.length ? (matches / items.length) * 100 : null;
+              return (
+                <tr key={bucket.label} className="border-b last:border-0">
+                  <td className="py-2 px-4">{bucket.label}</td>
+                  <td className="py-2 px-4 tabular-nums">{items.length || "n/a"}</td>
+                  <td className="py-2 px-4 tabular-nums">{pct == null ? "n/a" : `${pct.toFixed(1)}%`}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard title="Final accuracy" value={formatPercent(finalAccuracy, 1)} subtitle="Final values vs XBRL" icon={<Crosshair className="h-4 w-4" />} dataTestId="acc-final" />
         <KpiCard title="Original accuracy" value={formatPercent(originalAvg, 1)} subtitle="Pre-human-review values vs XBRL" icon={<Crosshair className="h-4 w-4" />} tone="info" dataTestId="acc-original" />
         <KpiCard title="Auto-approval accuracy" value={formatPercent(autoApprovalAvg, 1)} subtitle="Automated decisions that held" icon={<Crosshair className="h-4 w-4" />} tone="success" dataTestId="acc-auto" />
+        <KpiCard title="False auto-approvals" value={String(falseAutoApprovals)} subtitle="Auto-approved but wrong (target 0)" icon={<Crosshair className="h-4 w-4" />} tone={falseAutoApprovals === 0 ? "success" : "danger"} dataTestId="acc-false-auto" />
+        <KpiCard title="Escalation rate" value={formatPercent(escalationRateAvg, 1)} subtitle="Target 10–30%" icon={<Crosshair className="h-4 w-4" />} tone="warning" dataTestId="acc-escalation-rate" />
         <KpiCard title="Escalation precision" value={formatPercent(precisionAvg, 1)} subtitle="Escalated items resolved correctly" icon={<Crosshair className="h-4 w-4" />} tone="warning" dataTestId="acc-precision" />
       </div>
 
@@ -209,6 +195,7 @@ export function AccuracyPage() {
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">Metric</th>
+                <th className="py-2 pr-4 font-medium">Confidence</th>
                 <th className="py-2 pr-4 font-medium">Extracted</th>
                 <th className="py-2 pr-4 font-medium">Final</th>
                 <th className="py-2 pr-4 font-medium">XBRL</th>
@@ -220,11 +207,20 @@ export function AccuracyPage() {
               {metricDetails.map((d, i) => (
                 <tr key={`${d.metric}-${i}`} className="border-b last:border-0">
                   <td className="py-2.5 pr-4 font-medium">{d.metric}</td>
+                  <td className="py-2.5 pr-4 tabular-nums">{typeof d.confidence === "number" ? d.confidence.toFixed(2) : "—"}</td>
                   <td className="py-2.5 pr-4 tabular-nums">{formatUsdFull(d.extracted)}</td>
                   <td className="py-2.5 pr-4 tabular-nums">{formatUsdFull(d.final)}</td>
                   <td className="py-2.5 pr-4 tabular-nums">{formatUsdFull(d.xbrl)}</td>
-                  <td className="py-2.5 pr-4">{d.match ? <Badge variant="success">Match</Badge> : <Badge variant="danger">Mismatch</Badge>}</td>
-                  <td className="py-2.5 pr-4 tabular-nums">{d.diff_pct.toFixed(2)}%</td>
+                  <td className="py-2.5 pr-4">
+                    {d.match == null ? (
+                      <Badge variant="outline">No ground truth</Badge>
+                    ) : d.match ? (
+                      <Badge variant="success">Match</Badge>
+                    ) : (
+                      <Badge variant="danger">Mismatch</Badge>
+                    )}
+                  </td>
+                  <td className="py-2.5 pr-4 tabular-nums">{d.diff_pct == null ? "—" : `${d.diff_pct.toFixed(2)}%`}</td>
                 </tr>
               ))}
             </tbody>

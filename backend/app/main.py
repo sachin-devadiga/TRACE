@@ -72,6 +72,7 @@ class HumanDecision(BaseModel):
     decision: Literal["APPROVED", "CORRECTED", "REJECTED"]
     corrected_value: float | None = None
     notes: str = ""
+    acknowledge_risk: bool = False
 
     @model_validator(mode="after")
     def _require_correction(self) -> "HumanDecision":
@@ -231,6 +232,7 @@ def _state_response(thread_id: str, snapshot: Any) -> dict[str, Any]:
         "anomaly_explanations": values.get("anomaly_explanations") or {},
         "human_decisions": values.get("human_decisions") or [],
         "accuracy_report": values.get("accuracy_report") or {},
+        "side_effect_counts": values.get("side_effect_counts") or {},
         "escalation_precision_by_type": (
             values.get("accuracy_report") or {}
         ).get("escalation_precision_by_type")
@@ -282,6 +284,7 @@ def start_audit(request: StartAuditRequest) -> dict[str, Any]:
         "accuracy_report": {},
         "routing_decision": "",
         "demo_only": request.demo_only,
+        "side_effect_counts": {},
         "status": "STARTED",
     }
 

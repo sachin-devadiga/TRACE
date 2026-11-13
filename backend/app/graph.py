@@ -108,6 +108,7 @@ class AuditState(TypedDict, total=False):
     accuracy_report: dict[str, Any]
     routing_decision: str
     demo_only: bool
+    side_effect_counts: dict[str, int]
     status: str
 
 
@@ -627,6 +628,12 @@ def _unwrap_decisions(payload: Any) -> dict[str, Any]:
     return payload
 
 
+def _is_red_tier(item: dict[str, Any]) -> bool:
+    """Return True when a review item requires the explicit red-tier guard."""
+    severity = str(item.get("severity") or "").strip().upper()
+    return severity in {"FAIL", "HIGH", "RED", "CRITICAL"}
+
+
 def human_review_node(state: AuditState) -> dict[str, Any]:
     """Pause for human review, then apply and persist every human decision."""
     flagged = state.get("flagged_items") or []
@@ -669,6 +676,16 @@ def human_review_node(state: AuditState) -> dict[str, Any]:
             raise ValueError(
                 f"Metric {metric_name!r} has invalid decision {decision!r}; "
                 "expected APPROVED, CORRECTED, or REJECTED."
+            )
+        if (
+            decision == "APPROVED"
+            and _is_red_tier(item)
+            and not bool(entry.get("acknowledge_risk"))
+        ):
+            raise ValueError(
+                f"Metric {metric_name!r} is red-tier ({item.get('severity')}); "
+                "approving it requires acknowledge_risk=true after reviewing the "
+                "source evidence."
             )
 
         metric_index = next(
@@ -842,7 +859,9 @@ def _build_accuracy_report(
                     "match": False,
                     "original_match": None,
                     "final_match": None,
-                    "note": "No XBRL fact available for this metric role.",
+                    "confidence": original.get("confidence_score"),
+                    "confidence_label": original.get("confidence_label"),
+                    "note": "No XBRL fact available for this metric role (no ground truth).",
                 }
             )
             continue
@@ -900,6 +919,8 @@ def _build_accuracy_report(
                 "original_match": original_match,
                 "final_match": final_match,
                 "match": bool(final_match) if final_match is not None else original_match,
+                "confidence": original.get("confidence_score"),
+                "confidence_label": original.get("confidence_label"),
             }
         )
 
@@ -953,6 +974,7 @@ def _build_accuracy_report(
             "final_match": detail.get("final_match"),
             "original_difference": detail.get("original_difference"),
             "final_difference": detail.get("difference"),
+            "confidence": detail.get("confidence"),
             "escalation_types": detail.get("escalation_types") or [],
         }
         for detail in details
@@ -1055,6 +1077,13 @@ def _build_accuracy_report(
             (auto_matches / len(auto_details)) * 100.0, 2
         )
         auto_approval_accuracy_pct = max(0.0, min(100.0, auto_approval_accuracy_pct))
+    false_auto_approvals = len(auto_details) - auto_matches
+    escalation_rate_pct = None
+    if original_metrics:
+        escalation_rate_pct = round(
+            (len(escalated_names) / len(original_metrics)) * 100.0, 2
+        )
+        escalation_rate_pct = max(0.0, min(100.0, escalation_rate_pct))
 
     return {
         "thread_id": state.get("thread_id"),
@@ -1093,6 +1122,9 @@ def _build_accuracy_report(
         "auto_approval_accuracy_pct": auto_approval_accuracy_pct,
         "auto_approved_compared": len(auto_details),
         "auto_approved_matches": auto_matches,
+        "false_auto_approvals": false_auto_approvals,
+        "false_auto_approval_count": false_auto_approvals,
+        "escalation_rate_pct": escalation_rate_pct,
         "unresolved_flagged_count": len(unresolved),
         "audit_log_count": len(logs),
         "demo_only": bool(state.get("demo_only")),
@@ -1202,7 +1234,21 @@ def finalize_node(state: AuditState) -> dict[str, Any]:
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
 
-    return {"accuracy_report": accuracy_report, "status": "COMPLETED"}
+    side_effect_counts = {
+        "fetch_edgar": 1 if state.get("tables_markdown") else 0,
+        "extract_metrics": 1 if state.get("extracted_metrics") else 0,
+        "validate": 1 if state.get("validation_checks") else 0,
+        "persist_audit_decisions": 1 if get_audit_logs(thread_id) else 0,
+        "fetch_xbrl_truth": 0 if accuracy_report.get("error") else 1,
+        "write_accuracy_report": 1 if accuracy_report else 0,
+        "finalize": 1,
+    }
+    accuracy_report["side_effect_counts"] = side_effect_counts
+    return {
+        "accuracy_report": accuracy_report,
+        "side_effect_counts": side_effect_counts,
+        "status": "COMPLETED",
+    }
 
 
 # ---------------------------------------------------------------------------

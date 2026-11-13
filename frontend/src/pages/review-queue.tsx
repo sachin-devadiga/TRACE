@@ -28,6 +28,7 @@ interface LocalDecision {
   decision: "APPROVED" | "CORRECTED" | "REJECTED";
   corrected_value?: number;
   reviewer_notes?: string;
+  acknowledge_risk?: boolean;
 }
 
 export function ReviewQueuePage() {
@@ -72,6 +73,7 @@ export function ReviewQueuePage() {
           decision: x.decision!.decision,
           corrected_value: x.decision!.corrected_value,
           reviewer_notes: x.decision!.reviewer_notes,
+          acknowledge_risk: x.decision!.acknowledge_risk ?? false,
         })),
     };
     if (payload.decisions.length === 0) {
@@ -304,13 +306,22 @@ function ItemDetail({
   const navigate = useNavigate();
   const [correctedValue, setCorrectedValue] = useState<string>(String(flagged.value_usd));
   const [note, setNote] = useState("");
+  const [acknowledgeRisk, setAcknowledgeRisk] = useState(false);
 
   const isPending = flagged.decision_state === "FLAGGED";
+  const isRedTier = ["HIGH", "FAIL", "RED", "CRITICAL"].includes(String(flagged.severity).toUpperCase());
 
   const applyDecision = (d: LocalDecision) => {
-    const next = { ...d, reviewer_notes: note || d.reviewer_notes };
+    const next = { ...d, acknowledge_risk: acknowledgeRisk, reviewer_notes: note || d.reviewer_notes };
     if (d.decision === "CORRECTED") next.corrected_value = Number(correctedValue) || flagged.value_usd;
     onDecisionChange(next);
+  };
+
+  const toggleRisk = (checked: boolean) => {
+    setAcknowledgeRisk(checked);
+    if (decision?.decision === "APPROVED") {
+      onDecisionChange({ ...decision, acknowledge_risk: checked, reviewer_notes: note || decision.reviewer_notes });
+    }
   };
 
   return (
@@ -439,7 +450,7 @@ function ItemDetail({
         <section className="rounded-xl border p-4">
           <h4 className="text-sm font-semibold">Decision</h4>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="sm" variant={decision?.decision === "APPROVED" ? "default" : "outline"} onClick={() => applyDecision({ decision: "APPROVED" })} disabled={!isPending}>
+            <Button size="sm" variant={decision?.decision === "APPROVED" ? "default" : "outline"} onClick={() => applyDecision({ decision: "APPROVED" })} disabled={!isPending || (isRedTier && !acknowledgeRisk)}>
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Approve
             </Button>
             <Button size="sm" variant={decision?.decision === "CORRECTED" ? "default" : "outline"} onClick={() => applyDecision({ decision: "CORRECTED" })} disabled={!isPending}>
@@ -449,6 +460,28 @@ function ItemDetail({
               Reject
             </Button>
           </div>
+          {isRedTier ? (
+            <div className="mt-3 rounded-lg border border-danger/40 bg-danger/5 p-3">
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true" />
+                <div>
+                  <div className="font-medium">Red-tier value</div>
+                  <p className="text-muted-foreground">
+                    A hard validation check failed for this metric. Approving it requires explicit acknowledgement.
+                  </p>
+                  <label className="mt-2 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={acknowledgeRisk}
+                      onChange={(event) => toggleRisk(event.target.checked)}
+                      aria-label="Acknowledge red-tier risk"
+                    />
+                    I reviewed the source evidence and accept responsibility for approving this value.
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {isPending ? (
             <div className="mt-3 space-y-2">
               {decision?.decision === "CORRECTED" ? (

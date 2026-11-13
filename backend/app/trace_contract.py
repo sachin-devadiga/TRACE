@@ -362,11 +362,18 @@ def _to_accuracy_report(raw: Any) -> dict[str, Any] | None:
         metric_details.append(
             {
                 "metric": str(detail.get("metric_name") or detail.get("metric") or ""),
-                "extracted": extracted or 0.0,
-                "final": final or 0.0,
-                "xbrl": xbrl or 0.0,
-                "match": bool(detail.get("match")),
-                "diff_pct": round(diff_pct, 4),
+                "extracted": extracted,
+                "final": final,
+                "xbrl": xbrl,
+                "has_ground_truth": xbrl is not None,
+                "match": bool(detail.get("match")) if xbrl is not None else None,
+                "diff_pct": round(diff_pct, 4) if xbrl is not None else None,
+                "confidence": _as_fraction(detail.get("confidence")),
+                "confidence_label": detail.get("confidence_label"),
+                "escalation_types": [
+                    str(value) for value in (detail.get("escalation_types") or [])
+                ],
+                "note": str(detail.get("note") or ""),
             }
         )
 
@@ -389,6 +396,7 @@ def _to_accuracy_report(raw: Any) -> dict[str, Any] | None:
                 "final_match": entry.get("final_match"),
                 "original_difference": entry.get("original_difference"),
                 "final_difference": entry.get("final_difference"),
+                "confidence": _as_fraction(entry.get("confidence")),
                 "escalation_types": [
                     str(value) for value in (entry.get("escalation_types") or [])
                 ],
@@ -402,6 +410,15 @@ def _to_accuracy_report(raw: Any) -> dict[str, Any] | None:
             report.get("auto_approval_accuracy_pct")
         ),
         "auto_approved_count": _as_int(report.get("auto_approved_count")) or 0,
+        "auto_approved_compared": _as_int(report.get("auto_approved_compared")) or 0,
+        "auto_approved_matches": _as_int(report.get("auto_approved_matches")) or 0,
+        "false_auto_approvals": _as_int(
+            report.get("false_auto_approvals")
+            if report.get("false_auto_approvals") is not None
+            else report.get("false_auto_approval_count")
+        )
+        or 0,
+        "escalation_rate_pct": _as_fraction(report.get("escalation_rate_pct")),
         "escalated_count": _as_int(report.get("escalated_count")) or 0,
         "escalation_precision_pct": _as_fraction(report.get("escalation_precision_pct")),
         "escalation_precision_by_type": escalation_by_type,
@@ -475,6 +492,7 @@ def _to_status(thread_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             "segment_tolerance_pct": 0.001,
         },
         "demo_only": bool(payload.get("demo_only")),
+        "side_effect_counts": payload.get("side_effect_counts") or {},
         "created_at": str(payload.get("created_at") or ""),
         "updated_at": str(payload.get("updated_at") or payload.get("created_at") or ""),
     }
@@ -509,6 +527,10 @@ def _to_thread_summary(thread_id: str, status: dict[str, Any]) -> dict[str, Any]
         "accuracy_pct": _as_float(accuracy.get("accuracy_pct")),
         "original_accuracy_pct": _as_float(accuracy.get("original_accuracy_pct")),
         "auto_approval_accuracy_pct": _as_float(accuracy.get("auto_approval_accuracy_pct")),
+        "false_auto_approvals": _as_int(accuracy.get("false_auto_approvals"))
+        or _as_int(accuracy.get("false_auto_approval_count"))
+        or 0,
+        "escalation_rate_pct": _as_float(accuracy.get("escalation_rate_pct")),
         "escalation_precision_pct": _as_float(accuracy.get("escalation_precision_pct")),
         "escalation_recall_pct": _as_float(accuracy.get("escalation_recall_pct")),
         "escalation_precision_by_type": accuracy.get("escalation_precision_by_type") or {},
@@ -582,6 +604,7 @@ class ReviewDecisionInput(BaseModel):
     )
     corrected_value: float | None = Field(default=None, ge=0.0)
     reviewer_notes: str = ""
+    acknowledge_risk: bool = False
 
 
 class ResumeAuditRequest(BaseModel):
@@ -789,6 +812,7 @@ def trace_resume(thread_id: str, request: ResumeAuditRequest) -> dict[str, Any]:
             decision=decision.decision,  # type: ignore[arg-type]
             corrected_value=decision.corrected_value,
             notes=decision.reviewer_notes,
+            acknowledge_risk=decision.acknowledge_risk,
         )
         for decision in decisions
         if decision.decision in {"APPROVED", "CORRECTED", "REJECTED"}

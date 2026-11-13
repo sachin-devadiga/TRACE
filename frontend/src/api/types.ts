@@ -83,25 +83,34 @@ export interface Thresholds {
 }
 
 export interface AccuracyReport {
-  accuracy_pct: number;
-  original_accuracy_pct: number;
-  auto_approval_accuracy_pct: number;
+  accuracy_pct: number | null;
+  original_accuracy_pct: number | null;
+  auto_approval_accuracy_pct: number | null;
   auto_approved_count: number;
+  auto_approved_compared?: number;
+  auto_approved_matches?: number;
+  false_auto_approvals?: number;
+  escalation_rate_pct?: number | null;
   escalated_count: number;
-  escalation_precision_pct: number;
+  escalation_precision_pct: number | null;
   escalation_precision_by_type: Record<string, number>;
-  escalation_recall_pct: number;
+  escalation_recall_pct: number | null;
   per_metric_accuracy: Record<string, number>;
   metric_details: MetricAccuracyDetail[];
 }
 
 export interface MetricAccuracyDetail {
   metric: string;
-  extracted: number;
-  final: number;
-  xbrl: number;
-  match: boolean;
-  diff_pct: number;
+  extracted: number | null;
+  final: number | null;
+  xbrl: number | null;
+  has_ground_truth?: boolean;
+  match: boolean | null;
+  diff_pct: number | null;
+  confidence?: number | null;
+  confidence_label?: "HIGH" | "LOW" | null;
+  escalation_types?: string[];
+  note?: string;
 }
 
 export interface AuditLogRow {
@@ -162,11 +171,13 @@ export interface ThreadSummary {
   created_at: string;
   updated_at: string;
   demo_only: boolean;
-  accuracy_pct?: number;
-  original_accuracy_pct?: number;
-  auto_approval_accuracy_pct?: number;
-  escalation_precision_pct?: number;
-  escalation_recall_pct?: number;
+  accuracy_pct?: number | null;
+  original_accuracy_pct?: number | null;
+  auto_approval_accuracy_pct?: number | null;
+  false_auto_approvals?: number | null;
+  escalation_rate_pct?: number | null;
+  escalation_precision_pct?: number | null;
+  escalation_recall_pct?: number | null;
   escalation_precision_by_type?: Record<string, number>;
   metric_details?: MetricAccuracyDetail[];
 }
@@ -187,6 +198,7 @@ export interface AuditStatus {
   accuracy_report: AccuracyReport | null;
   thresholds: Thresholds;
   demo_only: boolean;
+  side_effect_counts?: Record<string, number>;
   created_at: string;
   updated_at: string;
 }
@@ -210,6 +222,7 @@ export interface ReviewDecisionInput {
   decision: "APPROVED" | "CORRECTED" | "REJECTED";
   corrected_value?: number;
   reviewer_notes?: string;
+  acknowledge_risk?: boolean;
 }
 
 export interface ResumePayload {

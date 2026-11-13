@@ -293,7 +293,7 @@ export function FilingDetailPage() {
             <TabsContent value="accuracy" className="mt-4">
               {accuracy ? (
                 <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-4">
                     <div className="rounded-xl border p-4">
                       <div className="text-xs uppercase tracking-wide text-muted-foreground">Accuracy</div>
                       <div className="mt-1 text-2xl font-semibold">{formatPercent(accuracy.accuracy_pct, 1)}</div>
@@ -301,6 +301,10 @@ export function FilingDetailPage() {
                     <div className="rounded-xl border p-4">
                       <div className="text-xs uppercase tracking-wide text-muted-foreground">Original accuracy</div>
                       <div className="mt-1 text-2xl font-semibold">{formatPercent(accuracy.original_accuracy_pct, 1)}</div>
+                    </div>
+                    <div className="rounded-xl border p-4">
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">False auto-approvals</div>
+                      <div className="mt-1 text-2xl font-semibold">{accuracy.false_auto_approvals ?? 0}</div>
                     </div>
                     <div className="rounded-xl border p-4">
                       <div className="text-xs uppercase tracking-wide text-muted-foreground">Escalation precision</div>
@@ -326,8 +330,16 @@ export function FilingDetailPage() {
                             <td className="py-2.5 pr-4 tabular-nums">{formatUsdFull(d.extracted)}</td>
                             <td className="py-2.5 pr-4 tabular-nums">{formatUsdFull(d.final)}</td>
                             <td className="py-2.5 pr-4 tabular-nums">{formatUsdFull(d.xbrl)}</td>
-                            <td className="py-2.5 pr-4">{d.match ? <Badge variant="success">Match</Badge> : <Badge variant="danger">Mismatch</Badge>}</td>
-                            <td className="py-2.5 pr-4 tabular-nums">{d.diff_pct.toFixed(2)}%</td>
+                            <td className="py-2.5 pr-4">
+                              {d.match == null ? (
+                                <Badge variant="outline">No ground truth</Badge>
+                              ) : d.match ? (
+                                <Badge variant="success">Match</Badge>
+                              ) : (
+                                <Badge variant="danger">Mismatch</Badge>
+                              )}
+                            </td>
+                            <td className="py-2.5 pr-4 tabular-nums">{d.diff_pct == null ? "—" : `${d.diff_pct.toFixed(2)}%`}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -323,12 +323,27 @@ export class MockTraceApi {
       original_accuracy_pct: originalAccuracy,
       auto_approval_accuracy_pct: autoApprovalAccuracy,
       auto_approved_count: autoApprovedMetrics.length,
+      false_auto_approvals: autoApprovedMetrics.filter(
+        (m) => details.find((d) => d.metric === m.metric_name)?.match === false
+      ).length,
+      escalation_rate_pct: thread.metrics.length
+        ? (thread.flagged_items.length / thread.metrics.length) * 100
+        : 0,
       escalated_count: resolvedEscalated.length,
       escalation_precision_pct: escalationPrecision,
       escalation_precision_by_type: escalationPrecisionByType,
       escalation_recall_pct: escalationRecall,
       per_metric_accuracy: perMetricAccuracy,
-      metric_details: details.map(({ metric, extracted, final, xbrl, match, diff_pct }) => ({ metric, extracted, final, xbrl, match, diff_pct })),
+      metric_details: details.map(({ metric, extracted, final, xbrl, match, diff_pct }) => ({
+        metric,
+        extracted,
+        final,
+        xbrl,
+        has_ground_truth: true,
+        match,
+        diff_pct,
+        confidence: thread.metrics.find((m) => m.metric_name === metric)?.confidence,
+      })),
     };
   }
 
@@ -364,6 +379,16 @@ export class MockTraceApi {
     if (!thread) throw new Error(`Thread ${threadId} not found`);
     await this.delay(400, 600);
     const decisionMap = new Map(payload.decisions.map((d) => [d.metric_name, d]));
+
+    for (const d of payload.decisions) {
+      const flagged = thread.flagged_items.find((item) => item.metric_name === d.metric_name);
+      const redTier = ["HIGH", "FAIL", "RED", "CRITICAL"].includes(String(flagged?.severity ?? "").toUpperCase());
+      if (d.decision === "APPROVED" && redTier && !d.acknowledge_risk) {
+        throw new Error(
+          `Metric ${d.metric_name} is red-tier; approve it only after acknowledging the risk.`,
+        );
+      }
+    }
 
     for (const m of thread.metrics) {
       const d = decisionMap.get(m.metric_name);
@@ -438,6 +463,8 @@ export class MockTraceApi {
       accuracy_pct: t.accuracy_report?.accuracy_pct ?? undefined,
       original_accuracy_pct: t.accuracy_report?.original_accuracy_pct,
       auto_approval_accuracy_pct: t.accuracy_report?.auto_approval_accuracy_pct,
+      false_auto_approvals: t.accuracy_report?.false_auto_approvals ?? 0,
+      escalation_rate_pct: t.accuracy_report?.escalation_rate_pct,
       escalation_precision_pct: t.accuracy_report?.escalation_precision_pct,
       escalation_recall_pct: t.accuracy_report?.escalation_recall_pct,
       escalation_precision_by_type: t.accuracy_report?.escalation_precision_by_type,
